@@ -9,11 +9,13 @@ Options:
   -m message   Commit message (default: "Auto-update: <iso-timestamp>")
   -r remote    Remote name to push to (default: origin)
   -n           Dry-run: show what would happen but don't commit or push
+  -P           Do not push after committing (commit only)
   -h           Show this help
 EOF
 }
 
 DRY_RUN=0
+NO_PUSH=0
 REMOTE=origin
 MSG=""
 
@@ -22,10 +24,18 @@ while getopts ":m:r:nh" opt; do
     m) MSG="$OPTARG" ;; 
     r) REMOTE="$OPTARG" ;;
     n) DRY_RUN=1 ;;
+    P) NO_PUSH=1 ;;
     h) usage; exit 0 ;;
     :) echo "Option -$OPTARG requires an argument." >&2; usage; exit 1 ;;
     \?) echo "Invalid option: -$OPTARG" >&2; usage; exit 1 ;;
   esac
+done
+
+# Support long option --no-push by shifting through args (simple support)
+for arg in "$@"; do
+  if [[ "$arg" == "--no-push" ]]; then
+    NO_PUSH=1
+  fi
 done
 
 # Determine repo root
@@ -80,7 +90,9 @@ else
   git commit -m "$MSG"
 fi
 
-if [[ $DRY_RUN -eq 1 ]]; then
+if [[ $NO_PUSH -eq 1 ]]; then
+  echo "NO_PUSH set — skipping push to remote."
+elif [[ $DRY_RUN -eq 1 ]]; then
   echo "DRY RUN: git push $REMOTE $branch"
 else
   echo "Pushing to $REMOTE/$branch..."
