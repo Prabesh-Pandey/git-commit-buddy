@@ -286,6 +286,67 @@ function activate(context) {
                 out.appendLine('git-autopush: AI provider call failed — falling back.');
             }
         }
+            // Fallback deterministic message
+            await presentSuggested(fallback);
+            return;
+        }
+
+        // If provider is deepseek and configured, attempt DeepSeek call
+        if (provider === 'deepseek' && apiKey && apiKey.length > 0) {
+            out.appendLine('git-autopush: contacting DeepSeek provider to generate message...');
+            try {
+                const https = require('https');
+                const deepseekUrl = cfg.get('ai.deepseekUrl', '').trim();
+                const endpoint = deepseekUrl && deepseekUrl.length > 0 ? deepseekUrl : 'https://api.deepseek.example/v1/generate';
+                const urlObj = new URL(endpoint);
+                const bodyText = doc.getText().slice(0, 2000);
+                const payload = JSON.stringify({ filename: path.basename(rel), content: bodyText });
+                const reqOpts = {
+                    hostname: urlObj.hostname,
+                    port: urlObj.port || 443,
+                    path: urlObj.pathname + (urlObj.search || ''),
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(payload),
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                };
+                const suggested = await new Promise((resolve, reject) => {
+                    const req = https.request(reqOpts, (res) => {
+                        let data = '';
+                        res.on('data', (chunk) => data += chunk);
+                        res.on('end', () => {
+                            try {
+                                const parsed = JSON.parse(data);
+                                const text = parsed && (parsed.commit_message || parsed.message || parsed.result);
+                                if (text && typeof text === 'string') {
+                                    resolve(text.trim());
+                                }
+                                else {
+                                    reject(new Error('No message in DeepSeek response'));
+                                }
+                            }
+                            catch (e) {
+                                reject(e);
+                            }
+                        });
+                    });
+                    req.on('error', (e) => reject(e));
+                    req.setTimeout(10000, () => { req.destroy(new Error('DeepSeek request timeout')); });
+                    req.write(payload);
+                    req.end();
+                });
+                const oneLine = suggested.split(/\r?\n/)[0].trim();
+                const finalMsg = oneLine.length > 0 ? oneLine : fallback;
+                out.appendLine(`git-autopush: DeepSeek suggested (truncated): ${finalMsg}`);
+                await presentSuggested(finalMsg);
+                return;
+            }
+            catch (e) {
+                out.appendLine('git-autopush: DeepSeek provider call failed — falling back.');
+            }
+        }
 
         // Fallback deterministic message
         await presentSuggested(fallback);
