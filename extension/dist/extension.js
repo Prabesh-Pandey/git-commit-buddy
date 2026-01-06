@@ -8,6 +8,31 @@ function activate(context) {
     // Note: read configuration inside the save handler so changes take effect immediately
     const terminal = vscode.window.createTerminal('git-autopush');
     const out = vscode.window.createOutputChannel('git-autopush-debug');
+    const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBar.command = 'git-autopush.runOnce';
+
+    function updateStatusBar() {
+        try {
+            const cfg = vscode.workspace.getConfiguration('gitAutopush');
+            const autoCommit = cfg.get('autoCommit', false);
+            const autoPush = cfg.get('autoPush', false);
+            const dryRun = cfg.get('dryRun', true);
+            let text = 'GitAuto:';
+            text += autoCommit ? ' Commit-On' : ' Commit-Off';
+            text += autoPush ? ' Push-On' : ' Push-Off';
+            if (dryRun) {
+                text += ' (dry)';
+            }
+            statusBar.text = text;
+            const last = context.workspaceState.get('gitAutopush.lastAction', null);
+            statusBar.tooltip = last ? `Last action: ${last}` : 'No actions yet';
+            statusBar.show();
+        }
+        catch (e) {
+            // ignore
+        }
+    }
+    updateStatusBar();
     const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
         var _a, _b;
         // Read current configuration at save time so updates take effect immediately
@@ -117,6 +142,86 @@ function activate(context) {
         terminal.sendText(cmd, true);
     });
     context.subscriptions.push(onSave);
+
+    // Commands
+    const toggleAutoCommit = vscode.commands.registerCommand('git-autopush.toggleAutoCommit', async () => {
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const cur = cfg.get('autoCommit', false);
+        await cfg.update('autoCommit', !cur, vscode.ConfigurationTarget.Workspace);
+        out.appendLine(`git-autopush: autoCommit set -> ${!cur}`);
+        updateStatusBar();
+        vscode.window.showInformationMessage(`git-autopush: autoCommit -> ${!cur}`);
+    });
+    context.subscriptions.push(toggleAutoCommit);
+
+    const toggleAutoPush = vscode.commands.registerCommand('git-autopush.toggleAutoPush', async () => {
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const cur = cfg.get('autoPush', false);
+        await cfg.update('autoPush', !cur, vscode.ConfigurationTarget.Workspace);
+        out.appendLine(`git-autopush: autoPush set -> ${!cur}`);
+        updateStatusBar();
+        vscode.window.showInformationMessage(`git-autopush: autoPush -> ${!cur}`);
+    });
+    context.subscriptions.push(toggleAutoPush);
+
+    const pauseCmd = vscode.commands.registerCommand('git-autopush.pause', async () => {
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const cur = cfg.get('autoCommit', false);
+        await cfg.update('autoCommit', !cur, vscode.ConfigurationTarget.Workspace);
+        out.appendLine(`git-autopush: pause toggled -> autoCommit ${!cur}`);
+        updateStatusBar();
+        vscode.window.showInformationMessage(`git-autopush: autoCommit -> ${!cur}`);
+    });
+    context.subscriptions.push(pauseCmd);
+
+    const runOnceCmd = vscode.commands.registerCommand('git-autopush.runOnce', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showWarningMessage('git-autopush: no active editor to run on');
+            return;
+        }
+        const doc = editor.document;
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const scriptPathCfg = cfg.get('scriptPath', '${workspaceFolder}/git-autopush.sh');
+        const dryRun = cfg.get('dryRun', true);
+        const autoPush = cfg.get('autoPush', false);
+        const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+        const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
+
+        // expand path similar to onSave
+        let scriptPath = scriptPathCfg || '';
+        if (workspaceFolder) {
+            scriptPath = scriptPath.replace(/\$\{workspaceFolder(:[^}]+)?\}/g, workspaceFolder);
+            scriptPath = scriptPath.replace(/\$\{workspaceRoot(:[^}]+)?\}/g, workspaceFolder);
+        }
+        scriptPath = scriptPath.replace(/\$HOME/g, process.env.HOME || '');
+        if (scriptPath.startsWith('~')) {
+            scriptPath = path.join(process.env.HOME || '', scriptPath.slice(1));
+        }
+        scriptPath = scriptPath.replace(/\$\{[^}]+\}/g, '');
+        if (!path.isAbsolute(scriptPath) && workspaceFolder) {
+            scriptPath = path.resolve(workspaceFolder, scriptPath);
+        }
+        if (!require('fs').existsSync(scriptPath)) {
+            const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
+            if (require('fs').existsSync(fallback)) {
+                scriptPath = fallback;
+            }
+        }
+
+        const message = `Manual run: ${path.basename(rel)}`;
+        const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
+        const noPushFlag = autoPush ? '' : '-P';
+        const cmd = `${quoted} -m "${message.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''} ${noPushFlag}`.trim();
+        out.appendLine(`git-autopush: manual command -> ${cmd}`);
+        context.workspaceState.update('gitAutopush.lastAction', new Date().toISOString());
+        updateStatusBar();
+        terminal.show(true);
+        terminal.sendText(cmd, true);
+    });
+    context.subscriptions.push(runOnceCmd);
+
+    context.subscriptions.push(statusBar);
 }
 exports.activate = activate;
 function deactivate() { }
