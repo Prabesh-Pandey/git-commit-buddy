@@ -1,0 +1,30 @@
+{
+  "name": "git-autopush-on-save",
+  "displayName": "Git AutoPush on Save",
+  "description": "Run git-autopush.sh automatically when files matching configured globs are saved.",
+  "publisher": "local",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/local/git-autopush-on-save.git"
+  },
+  "version": "0.0.1",
+  "engines": {"vscode": "^1.60.0"},
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "compile": "tsc -p ./",
+    "build": "npm run compile",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.3",
+    "@types/node": "^14.14.37",
+    "@types/vscode": "^1.60.0",
+    "@types/minimatch": "^5.0.0"
+  },
+  "dependencies": {
+    "minimatch": "^5.1.0"
+  }
+}
