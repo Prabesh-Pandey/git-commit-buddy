@@ -1,0 +1,12 @@
+{
+  // Example settings for the 'Run on Save' extension (emeraldwalk.runonsave)
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.(py|js|ts|md)$",
+        "cmd": "${workspaceFolder}/Per/Scripts/git-autopush.sh -m 'Saved: $file'",
+        "runIn": "terminal"
+      }
+    ]
+  }
+}

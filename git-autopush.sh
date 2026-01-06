@@ -36,6 +36,13 @@ if [[ -z "$repo_root" ]]; then
 fi
 cd "$repo_root"
 
+# Determine this script's path and, if it's inside the repo, compute a repo-relative path
+script_abs=$(readlink -f "${BASH_SOURCE[0]:-$0}" 2>/dev/null || realpath "${BASH_SOURCE[0]:-$0}" 2>/dev/null || printf '%s' "${BASH_SOURCE[0]:-$0}")
+script_rel=""
+if [[ -n "$repo_root" && "$script_abs" == "$repo_root"* ]]; then
+  script_rel="${script_abs#$repo_root/}"
+fi
+
 # Determine current branch (or detached HEAD short SHA)
 branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD)
 
@@ -51,8 +58,14 @@ echo "Remote: $REMOTE"
 echo "Staging changes..."
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "DRY RUN: git add -A"
+  if [[ -n "$script_rel" ]]; then
+    echo "DRY RUN: git reset -- \"$script_rel\"  # would unstage script"
+  fi
 else
   git add -A
+  if [[ -n "$script_rel" ]]; then
+    git reset -- "$script_rel" || true
+  fi
 fi
 
 # If nothing staged, exit nicely

@@ -1,0 +1,7 @@
+# Ignore the autopush helper scripts and local editor settings
+git-autopush.sh
+git-autopush-watcher.sh
+git-autopush.md
+
+# Ignore local VS Code workspace settings (keep them local)
+.vscode/settings.json
