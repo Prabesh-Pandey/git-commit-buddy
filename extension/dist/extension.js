@@ -140,11 +140,14 @@ function activate(context) {
         out.show(true);
         terminal.show(true);
         terminal.sendText(cmd, true);
-            }
-            catch (e) {
-                out.appendLine('git-autopush: AI provider call failed — falling back.');
-            }
-        }
+
+    });
+    context.subscriptions.push(onSave);
+
+    const toggleAutoCommit = vscode.commands.registerCommand('git-autopush.toggleAutoCommit', async () => {
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const cur = cfg.get('autoCommit', false);
+        await cfg.update('autoCommit', !cur, vscode.ConfigurationTarget.Workspace);
         out.appendLine(`git-autopush: autoCommit set -> ${!cur}`);
         updateStatusBar();
         vscode.window.showInformationMessage(`git-autopush: autoCommit -> ${!cur}`);
