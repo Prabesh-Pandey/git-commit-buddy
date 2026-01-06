@@ -78,7 +78,7 @@
           "default": [".env", "*.key", "credentials.json", "*.pem"],
           "description": "File globs that must never be auto-committed."
         }
-        "gitAutopush.ai.enabled": {
+        ,"gitAutopush.ai.enabled": {
           "type": "boolean",
           "default": false,
           "description": "Enable AI-generated commit messages (opt-in)."
@@ -109,7 +109,7 @@
           "type": "boolean",
           "default": true,
           "description": "When true, present the AI-generated commit message for user review/edit before committing."
-        },
+        }
       }
     }
   },

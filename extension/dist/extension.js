@@ -135,7 +135,8 @@ function activate(context) {
         const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
         // If autoPush is false, instruct script to commit only (use --no-push / -P)
         const noPushFlag = autoPush ? '' : '-P';
-        const cmd = `${quoted} -m "${message.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''} ${noPushFlag}`.trim();
+        // Place the no-push flag immediately after the script path to avoid order sensitivity
+        const cmd = `${quoted} ${noPushFlag} ${dryRun ? '-n' : ''} -m "${message.replace(/"/g, '\\"')}"`.trim();
         out.appendLine(`git-autopush: running command -> ${cmd}`);
         out.show(true);
         terminal.show(true);
@@ -399,7 +400,8 @@ function activate(context) {
         const message = `Manual run: ${path.basename(rel)}`;
         const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
         const noPushFlag = autoPush ? '' : '-P';
-        const cmd = `${quoted} -m "${message.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''} ${noPushFlag}`.trim();
+        // Ensure -P comes right after the script path to avoid script option parsing issues
+        const cmd = `${quoted} ${noPushFlag} ${dryRun ? '-n' : ''} -m "${message.replace(/"/g, '\\"')}"`.trim();
         out.appendLine(`git-autopush: manual command -> ${cmd}`);
         context.workspaceState.update('gitAutopush.lastAction', new Date().toISOString());
         updateStatusBar();
