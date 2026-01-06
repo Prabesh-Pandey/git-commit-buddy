@@ -10,6 +10,51 @@
   "version": "0.0.1",
   "engines": {"vscode": "^1.60.0"},
   "categories": ["Other"],
+  "contributes": {
+    "configuration": {
+      "title": "Git AutoPush",
+      "properties": {
+        "gitAutopush.autoCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic commits on save (opt-in)."
+        },
+        "gitAutopush.autoPush": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic push after commit (opt-in)."
+        },
+        "gitAutopush.dryRun": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, actions are logged but not executed. Safe default."
+        },
+        "gitAutopush.scriptPath": {
+          "type": "string",
+          "default": "${workspaceFolder}/git-autopush.sh",
+          "description": "Path to the `git-autopush.sh` script to run."
+        },
+        "gitAutopush.watchGlobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/*.{py,js,ts,md,json,txt}"],
+          "description": "Glob patterns of files to watch for saves."
+        },
+        "gitAutopush.protectedBranches": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["main", "master", "production"],
+          "description": "Branches where auto-push is disabled by default."
+        },
+        "gitAutopush.sensitiveFileGlobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".env", "*.key", "credentials.json", "*.pem"],
+          "description": "File globs that must never be auto-committed."
+        }
+      }
+    }
+  },
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
   "scripts": {
