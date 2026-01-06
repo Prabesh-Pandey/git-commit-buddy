@@ -86,7 +86,7 @@
         "gitAutopush.ai.provider": {
           "type": "string",
           "default": "openai",
-          "enum": ["openai", "none"],
+          "enum": ["openai", "deepseek", "none"],
           "description": "AI provider to use for generating commit messages."
         },
         "gitAutopush.ai.apiKey": {
@@ -99,6 +99,11 @@
           "type": "boolean",
           "default": false,
           "description": "When true, attempt to generate commit messages via AI (requires opt-in and API key)."
+        },
+        "gitAutopush.ai.deepseekUrl": {
+          "type": "string",
+          "default": "",
+          "description": "(Optional) DeepSeek API URL to use when `ai.provider` is set to `deepseek`. If empty, default DeepSeek endpoint will be used."
         },
         "gitAutopush.ai.reviewBeforeCommit": {
           "type": "boolean",
