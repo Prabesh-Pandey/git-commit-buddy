@@ -15,6 +15,10 @@ function activate(context) {
         const scriptPathCfg = config.get('scriptPath', '${workspaceFolder}/git-autopush.sh');
         const globs = config.get('watchGlobs', ['**/*.{py,js,ts,md,json,txt}']);
         const dryRun = config.get('dryRun', true);
+        const autoCommit = config.get('autoCommit', false);
+        const autoPush = config.get('autoPush', false);
+        const protectedBranches = config.get('protectedBranches', ['main', 'master', 'production']);
+        const sensitivePatterns = config.get('sensitiveFileGlobs', ['.env', '*.key', 'credentials.json', '*.pem']);
         const workspaceFolder = ((_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath) || '';
         const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
         // check globs
@@ -27,6 +31,54 @@ function activate(context) {
         }
         if (!matched) {
             return;
+        }
+
+        // If autoCommit is not enabled, skip.
+        if (!autoCommit) {
+            out.appendLine('git-autopush: autoCommit disabled — skipping.');
+            return;
+        }
+
+        // Basic safety checks: ensure inside git repo and file isn't ignored/sensitive
+        let repoRoot = '';
+        try {
+            repoRoot = require('child_process').execSync('git rev-parse --show-toplevel', { cwd: workspaceFolder, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+        }
+        catch (e) {
+            out.appendLine('git-autopush: workspace is not a git repository — skipping.');
+            return;
+        }
+
+        // Don't act on ignored files
+        try {
+            const check = require('child_process').spawnSync('git', ['check-ignore', doc.uri.fsPath], { cwd: repoRoot });
+            if (check.status === 0) {
+                out.appendLine(`git-autopush: file is ignored by git (check-ignore) — skipping: ${rel}`);
+                return;
+            }
+        }
+        catch (e) {
+            // ignore check errors
+        }
+
+        // Don't act on sensitive file patterns
+        for (const p of sensitivePatterns) {
+            if (minimatch(rel, p)) {
+                out.appendLine(`git-autopush: file matches sensitive pattern '${p}' — skipping: ${rel}`);
+                return;
+            }
+        }
+
+        // Branch safety: if autoPush enabled, avoid protected branches
+        let branch = '';
+        try {
+            branch = require('child_process').execSync('git symbolic-ref --short HEAD', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+        }
+        catch (e) {
+            branch = require('child_process').execSync('git rev-parse --short HEAD', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+        }
+        if (autoPush && protectedBranches.includes(branch)) {
+            out.appendLine(`git-autopush: autoPush disabled on protected branch '${branch}' — skipping push.`);
         }
         // Aggressively expand vars and normalize script path
         let scriptPath = scriptPathCfg || '';
@@ -56,7 +108,9 @@ function activate(context) {
         const timestamp = new Date().toISOString();
         const message = `Saved: ${path.basename(rel)}`;
         const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
-        const cmd = `${quoted} -m "${message.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''}`;
+        // If autoPush is false, instruct script to commit only (use --no-push / -P)
+        const noPushFlag = autoPush ? '' : '-P';
+        const cmd = `${quoted} -m "${message.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''} ${noPushFlag}`.trim();
         out.appendLine(`git-autopush: running command -> ${cmd}`);
         out.show(true);
         terminal.show(true);
