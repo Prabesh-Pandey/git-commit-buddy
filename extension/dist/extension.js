@@ -286,12 +286,11 @@ function activate(context) {
                 out.appendLine('git-autopush: AI provider call failed — falling back.');
             }
         }
-        else {
             // Fallback deterministic message
             await presentSuggested(fallback);
             return;
         }
-
+    
         // If provider is deepseek and configured, attempt DeepSeek call
         if (provider === 'deepseek' && apiKey && apiKey.length > 0) {
             out.appendLine('git-autopush: contacting DeepSeek provider to generate message...');
