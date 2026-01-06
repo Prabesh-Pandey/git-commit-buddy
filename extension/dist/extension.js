@@ -140,13 +140,9 @@ function activate(context) {
         out.show(true);
         terminal.show(true);
         terminal.sendText(cmd, true);
-    });
-    context.subscriptions.push(onSave);
-
-    // Commands
-    const toggleAutoCommit = vscode.commands.registerCommand('git-autopush.toggleAutoCommit', async () => {
-        const cfg = vscode.workspace.getConfiguration('gitAutopush');
-        const cur = cfg.get('autoCommit', false);
+                }
+            }
+        }
         await cfg.update('autoCommit', !cur, vscode.ConfigurationTarget.Workspace);
         out.appendLine(`git-autopush: autoCommit set -> ${!cur}`);
         updateStatusBar();
