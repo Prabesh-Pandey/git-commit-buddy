@@ -11,6 +11,24 @@
   "engines": {"vscode": "^1.60.0"},
   "categories": ["Other"],
   "contributes": {
+    "commands": [
+      {
+        "command": "git-autopush.toggleAutoCommit",
+        "title": "Git AutoPush: Toggle Auto Commit"
+      },
+      {
+        "command": "git-autopush.toggleAutoPush",
+        "title": "Git AutoPush: Toggle Auto Push"
+      },
+      {
+        "command": "git-autopush.runOnce",
+        "title": "Git AutoPush: Run Once Now"
+      },
+      {
+        "command": "git-autopush.pause",
+        "title": "Git AutoPush: Pause/Resume"
+      }
+    ],
     "configuration": {
       "title": "Git AutoPush",
       "properties": {
@@ -55,7 +73,13 @@
       }
     }
   },
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:git-autopush.toggleAutoCommit",
+    "onCommand:git-autopush.toggleAutoPush",
+    "onCommand:git-autopush.runOnce",
+    "onCommand:git-autopush.pause"
+  ],
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run build",
