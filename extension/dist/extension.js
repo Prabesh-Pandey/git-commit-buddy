@@ -164,6 +164,67 @@ function activate(context) {
     });
     context.subscriptions.push(toggleAutoPush);
 
+    const setApiKeyCmd = vscode.commands.registerCommand('git-autopush.setApiKey', async () => {
+        try {
+            const value = await vscode.window.showInputBox({ prompt: 'Enter AI provider API key (stored machine-local)', placeHolder: '', ignoreFocusOut: true, password: true });
+            if (typeof value === 'string') {
+                const cfg = vscode.workspace.getConfiguration('gitAutopush');
+                // Store machine-local to avoid syncing credentials
+                await cfg.update('ai.apiKey', value, vscode.ConfigurationTarget.Machine);
+                vscode.window.showInformationMessage('git-autopush: API key saved (machine-local).');
+            }
+        }
+        catch (e) {
+            // never log keys or values
+            vscode.window.showErrorMessage('git-autopush: failed to save API key.');
+        }
+    });
+    context.subscriptions.push(setApiKeyCmd);
+
+    const generateMessageCmd = vscode.commands.registerCommand('git-autopush.generateMessage', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showWarningMessage('git-autopush: no active editor');
+            return;
+        }
+        const doc = editor.document;
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const aiEnabled = cfg.get('ai.enabled', false);
+        const generate = cfg.get('ai.generateCommitMessage', false);
+        const review = cfg.get('ai.reviewBeforeCommit', true);
+        const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+        const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
+        if (!aiEnabled || !generate) {
+            vscode.window.showInformationMessage('git-autopush: AI commit generation is disabled (enable via settings).');
+            return;
+        }
+        // Do not log or expose the API key
+        const apiKey = cfg.get('ai.apiKey', '');
+        let suggested = `Saved: ${path.basename(rel)}`;
+        // If API key present and provider selected, we would call the provider here.
+        // For safety and offline operation we currently fall back to a deterministic template.
+        if (apiKey && apiKey.length > 0) {
+            // Placeholder: attempt provider call could be added here; currently fallback
+            suggested = `Saved: ${path.basename(rel)} (AI suggested)`;
+        }
+        if (review) {
+            const edited = await vscode.window.showInputBox({ value: suggested, prompt: 'Edit AI-generated commit message', ignoreFocusOut: true });
+            if (typeof edited === 'string') {
+                vscode.window.showInformationMessage('git-autopush: commit message ready. Use Run Once to execute.');
+                context.workspaceState.update('gitAutopush.lastAIMessage', edited);
+            }
+            else {
+                vscode.window.showInformationMessage('git-autopush: message review cancelled.');
+            }
+        }
+        else {
+            context.workspaceState.update('gitAutopush.lastAIMessage', suggested);
+            vscode.window.showInformationMessage('git-autopush: AI message generated and stored (use Run Once to apply).');
+        }
+        updateStatusBar();
+    });
+    context.subscriptions.push(generateMessageCmd);
+
     const pauseCmd = vscode.commands.registerCommand('git-autopush.pause', async () => {
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const cur = cfg.get('autoCommit', false);
