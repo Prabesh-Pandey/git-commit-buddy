@@ -33,6 +33,32 @@ function activate(context) {
     const out = vscode.window.createOutputChannel('git-autopush-debug');
     const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
         var _a, _b;
+        // Guard: only proceed when a valid per-document trigger token exists.
+        // This prevents reacting to programmatic or external saves.
+        try {
+            const token = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
+            if (!token || !token.path) {
+                out.appendLine(`git-autopush: src onSave ignored (no token) for ${doc.uri.fsPath}`);
+                return;
+            }
+            const now = Date.now();
+            if (!token.expires || token.expires < now) {
+                out.appendLine(`git-autopush: src token expired for ${token.path}`);
+                context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+                return;
+            }
+            if (token.path !== doc.uri.fsPath) {
+                out.appendLine(`git-autopush: src token path mismatch (token=${token.path}) — ignoring save ${doc.uri.fsPath}`);
+                return;
+            }
+            // consume token
+            context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+        }
+        catch (e) {
+            // if anything goes wrong, be conservative and ignore the save
+            out.appendLine('git-autopush: src onSave token check failed — ignoring save');
+            return;
+        }
         // Read current configuration at save time so updates take effect immediately
         const config = vscode.workspace.getConfiguration('gitAutopush');
         const scriptPathCfg = config.get('scriptPath', '${workspaceFolder}/git-autopush.sh');
