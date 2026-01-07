@@ -56,8 +56,22 @@ function activate(context) {
             return;
         }
         out.appendLine(`git-autopush: valid trigger token matched for ${doc.uri.fsPath}`);
-        // clear the token so subsequent saves don't trigger actions
-        context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+        // Validate in-memory nonce to ensure only our process set the token
+        try {
+            const expectedNonce = token.nonce || null;
+            const currentNonce = triggerNonces.get(doc.uri.fsPath) || null;
+            if (!expectedNonce || !currentNonce || expectedNonce !== currentNonce) {
+                out.appendLine(`git-autopush: nonce mismatch or missing for ${doc.uri.fsPath} (expected=${expectedNonce}, current=${currentNonce})`);
+                return;
+            }
+            // consume both workspace token and in-memory nonce
+            context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+            triggerNonces.delete(doc.uri.fsPath);
+        }
+        catch (e) {
+            out.appendLine('git-autopush: nonce validation failed — ignoring save');
+            return;
+        }
         var _a, _b;
         // Read current configuration at save time so updates take effect immediately
         const config = vscode.workspace.getConfiguration('gitAutopush');
