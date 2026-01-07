@@ -35,12 +35,25 @@ function activate(context) {
     updateStatusBar();
     const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
         // Only act on saves that were triggered via our save-and-run keybinding.
-        // We store the exact document path when the keybinding runs to avoid
-        // reacting to external or assistant-made file changes.
-        const expectedPath = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
-        if (!expectedPath || expectedPath !== doc.uri.fsPath) {
+        // We store an object { path, expires } when the keybinding runs to avoid
+        // reacting to external or assistant-made file changes. Token is ephemeral.
+        const token = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
+        if (!token || !token.path) {
+            out.appendLine(`git-autopush: no trigger token set — ignoring save: ${doc.uri.fsPath}`);
             return;
         }
+        // If token expired, clear and ignore
+        const now = Date.now();
+        if (!token.expires || token.expires < now) {
+            out.appendLine(`git-autopush: trigger token expired for ${token.path} (now=${now}, expires=${token.expires})`);
+            context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+            return;
+        }
+        if (token.path !== doc.uri.fsPath) {
+            out.appendLine(`git-autopush: trigger token path mismatch (token=${token.path}) — save for ${doc.uri.fsPath} ignored`);
+            return;
+        }
+        out.appendLine(`git-autopush: valid trigger token matched for ${doc.uri.fsPath}`);
         // clear the token so subsequent saves don't trigger actions
         context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
         var _a, _b;
