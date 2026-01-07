@@ -10,6 +10,8 @@ function activate(context) {
     const out = vscode.window.createOutputChannel('git-autopush-debug');
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBar.command = 'git-autopush.runOnce';
+    // In-memory nonces for trigger tokens; stored here so external processes can't set them.
+    const triggerNonces = new Map();
 
     function updateStatusBar() {
         try {
