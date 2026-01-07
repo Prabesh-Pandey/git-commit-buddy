@@ -1,4 +1,4 @@
-# Git AutoPush on Save
+is # Git AutoPush on Save
 
 VS Code extension to run a configured `git-autopush.sh` script when files matching configured globs are saved.
 
