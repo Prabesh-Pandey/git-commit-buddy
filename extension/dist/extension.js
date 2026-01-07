@@ -410,7 +410,9 @@ function activate(context) {
             return;
         }
         // Mark accepted for this file; commit will happen on next save
+        const ts = Date.now();
         context.workspaceState.update(`gitAutopush.aiAcceptedFor:${rel}`, true);
+        context.workspaceState.update(`gitAutopush.aiAcceptedAt:${rel}`, ts);
         context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', false);
         vscode.window.showInformationMessage('git-autopush: AI suggestion accepted — save the file to commit.');
         updateStatusBar();
