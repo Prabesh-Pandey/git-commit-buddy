@@ -371,6 +371,38 @@ function activate(context) {
     });
     context.subscriptions.push(generateMessageCmd);
 
+    // Command to accept a pending AI suggestion for the current file
+    const acceptAICmd = vscode.commands.registerCommand('git-autopush.acceptAI', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showWarningMessage('git-autopush: no active editor to accept AI suggestion for');
+            return;
+        }
+        const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+        const rel = workspaceFolder ? path.relative(workspaceFolder, editor.document.uri.fsPath) : editor.document.uri.fsPath;
+        const pending = context.workspaceState.get('gitAutopush.aiPendingFile', null);
+        if (!pending || pending !== rel) {
+            vscode.window.showInformationMessage('git-autopush: no pending AI suggestion for this file.');
+            return;
+        }
+        // Mark accepted for this file; commit will happen on next save
+        context.workspaceState.update(`gitAutopush.aiAcceptedFor:${rel}`, true);
+        context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', false);
+        vscode.window.showInformationMessage('git-autopush: AI suggestion accepted — save the file to commit.');
+        updateStatusBar();
+    });
+    context.subscriptions.push(acceptAICmd);
+
+    // Command to reject a pending AI suggestion
+    const rejectAICmd = vscode.commands.registerCommand('git-autopush.rejectAI', async () => {
+        context.workspaceState.update('gitAutopush.aiPendingMessage', null);
+        context.workspaceState.update('gitAutopush.aiPendingFile', null);
+        context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', false);
+        vscode.window.showInformationMessage('git-autopush: AI suggestion rejected.');
+        updateStatusBar();
+    });
+    context.subscriptions.push(rejectAICmd);
+
     const pauseCmd = vscode.commands.registerCommand('git-autopush.pause', async () => {
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const cur = cfg.get('autoCommit', false);
