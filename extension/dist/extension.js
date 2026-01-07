@@ -457,10 +457,12 @@ function activate(context) {
         }
         // Store the exact document path as a one-time token so only this save triggers.
         const docPath = editor.document.uri.fsPath;
-        // token expires shortly to avoid stale tokens (5 seconds)
+        // token expires shortly to avoid stale tokens (5 seconds) and include an in-memory nonce
         const expires = Date.now() + 5000;
-        await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', { path: docPath, expires });
-        out.appendLine(`git-autopush: saveAndRun token set for ${docPath} (expires=${expires})`);
+        const nonce = Math.random().toString(36).slice(2);
+        await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', { path: docPath, nonce, expires });
+        triggerNonces.set(docPath, nonce);
+        out.appendLine(`git-autopush: saveAndRun token set for ${docPath} (expires=${expires}, nonce=${nonce})`);
         // perform the normal save action; onDidSave will observe the token
         await vscode.commands.executeCommand('workbench.action.files.save');
     });
