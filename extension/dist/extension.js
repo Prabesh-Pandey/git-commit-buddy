@@ -35,13 +35,14 @@ function activate(context) {
     updateStatusBar();
     const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
         // Only act on saves that were triggered via our save-and-run keybinding.
-        // This prevents reacting to programmatic or other saves.
-        const triggered = context.workspaceState.get('gitAutopush.triggeredBySaveKey', false);
-        if (!triggered) {
+        // We store the exact document path when the keybinding runs to avoid
+        // reacting to external or assistant-made file changes.
+        const expectedPath = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
+        if (!expectedPath || expectedPath !== doc.uri.fsPath) {
             return;
         }
-        // clear the flag so subsequent saves don't trigger actions
-        context.workspaceState.update('gitAutopush.triggeredBySaveKey', false);
+        // clear the token so subsequent saves don't trigger actions
+        context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
         var _a, _b;
         // Read current configuration at save time so updates take effect immediately
         const config = vscode.workspace.getConfiguration('gitAutopush');
@@ -425,9 +426,10 @@ function activate(context) {
             await vscode.commands.executeCommand('workbench.action.files.save');
             return;
         }
-        // mark that the next save should trigger the autopush flow
-        await context.workspaceState.update('gitAutopush.triggeredBySaveKey', true);
-        // perform the normal save action; onDidSave will observe the flag
+        // Store the exact document path as a one-time token so only this save triggers.
+        const docPath = editor.document.uri.fsPath;
+        await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', docPath);
+        // perform the normal save action; onDidSave will observe the token
         await vscode.commands.executeCommand('workbench.action.files.save');
     });
     context.subscriptions.push(saveAndRunCmd);
