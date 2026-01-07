@@ -75,12 +75,29 @@ function activate(context) {
                     return;
                 }
             }
-            // If AI suggestion was accepted for this file, allow commit and then clear acceptance flag
+            // If AI suggestion was accepted for this file, allow commit only if acceptance happened before this save.
             const acceptedKey = `gitAutopush.aiAcceptedFor:${relPath}`;
+            const acceptedAtKey = `gitAutopush.aiAcceptedAt:${relPath}`;
             const wasAccepted = context.workspaceState.get(acceptedKey, false);
             if (wasAccepted) {
+                try {
+                    const fs = require('fs');
+                    const stat = fs.statSync(doc.uri.fsPath);
+                    const mtime = stat.mtimeMs || stat.mtime.getTime();
+                    const acceptedAt = context.workspaceState.get(acceptedAtKey, 0);
+                    // Only proceed if the file mtime is equal or newer than the acceptance time
+                    if (!(acceptedAt && acceptedAt <= mtime)) {
+                        out.appendLine('git-autopush: suggestion accepted but file not saved after acceptance — skipping auto-commit until next save.');
+                        return;
+                    }
+                }
+                catch (e) {
+                    out.appendLine('git-autopush: could not verify file mtime; skipping AI-accept commit as a safety measure.');
+                    return;
+                }
                 // clear acceptance so we don't auto-commit repeatedly
                 context.workspaceState.update(acceptedKey, false);
+                context.workspaceState.update(acceptedAtKey, 0);
                 context.workspaceState.update('gitAutopush.aiPendingMessage', null);
                 context.workspaceState.update('gitAutopush.aiPendingFile', null);
                 context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', false);
