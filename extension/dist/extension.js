@@ -34,6 +34,14 @@ function activate(context) {
     }
     updateStatusBar();
     const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
+        // Only act on saves that were triggered via our save-and-run keybinding.
+        // This prevents reacting to programmatic or other saves.
+        const triggered = context.workspaceState.get('gitAutopush.triggeredBySaveKey', false);
+        if (!triggered) {
+            return;
+        }
+        // clear the flag so subsequent saves don't trigger actions
+        context.workspaceState.update('gitAutopush.triggeredBySaveKey', false);
         var _a, _b;
         // Read current configuration at save time so updates take effect immediately
         const config = vscode.workspace.getConfiguration('gitAutopush');
@@ -409,6 +417,20 @@ function activate(context) {
         terminal.sendText(cmd, true);
     });
     context.subscriptions.push(runOnceCmd);
+
+    const saveAndRunCmd = vscode.commands.registerCommand('git-autopush.saveAndRun', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            // fallback to normal save if no active editor
+            await vscode.commands.executeCommand('workbench.action.files.save');
+            return;
+        }
+        // mark that the next save should trigger the autopush flow
+        await context.workspaceState.update('gitAutopush.triggeredBySaveKey', true);
+        // perform the normal save action; onDidSave will observe the flag
+        await vscode.commands.executeCommand('workbench.action.files.save');
+    });
+    context.subscriptions.push(saveAndRunCmd);
 
     context.subscriptions.push(statusBar);
 }
