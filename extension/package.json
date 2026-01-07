@@ -78,11 +78,6 @@
           "default": [".env", "*.key", "credentials.json", "*.pem"],
           "description": "File globs that must never be auto-committed."
         }
-        ,"gitAutopush.requireAcceptForAll": {
-          "type": "boolean",
-          "default": true,
-          "description": "When true, require explicit acceptance before any auto-commit (prevents commits from other AI tools until accepted)."
-        }
         ,"gitAutopush.ai.enabled": {
           "type": "boolean",
           "default": false,

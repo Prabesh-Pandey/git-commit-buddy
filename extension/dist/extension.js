@@ -75,29 +75,12 @@ function activate(context) {
                     return;
                 }
             }
-            // If AI suggestion was accepted for this file, allow commit only if acceptance happened before this save.
+            // If AI suggestion was accepted for this file, allow commit and then clear acceptance flag
             const acceptedKey = `gitAutopush.aiAcceptedFor:${relPath}`;
-            const acceptedAtKey = `gitAutopush.aiAcceptedAt:${relPath}`;
             const wasAccepted = context.workspaceState.get(acceptedKey, false);
             if (wasAccepted) {
-                try {
-                    const fs = require('fs');
-                    const stat = fs.statSync(doc.uri.fsPath);
-                    const mtime = stat.mtimeMs || stat.mtime.getTime();
-                    const acceptedAt = context.workspaceState.get(acceptedAtKey, 0);
-                    // Only proceed if the file mtime is equal or newer than the acceptance time
-                    if (!(acceptedAt && acceptedAt <= mtime)) {
-                        out.appendLine('git-autopush: suggestion accepted but file not saved after acceptance — skipping auto-commit until next save.');
-                        return;
-                    }
-                }
-                catch (e) {
-                    out.appendLine('git-autopush: could not verify file mtime; skipping AI-accept commit as a safety measure.');
-                    return;
-                }
                 // clear acceptance so we don't auto-commit repeatedly
                 context.workspaceState.update(acceptedKey, false);
-                context.workspaceState.update(acceptedAtKey, 0);
                 context.workspaceState.update('gitAutopush.aiPendingMessage', null);
                 context.workspaceState.update('gitAutopush.aiPendingFile', null);
                 context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', false);
@@ -118,39 +101,6 @@ function activate(context) {
         if (!autoCommit) {
             out.appendLine('git-autopush: autoCommit disabled — skipping.');
             return;
-        }
-
-        // Optional safety: if configured, require explicit acceptance for ALL commits (not just extension-generated suggestions).
-        const requireAcceptForAll = config.get('requireAcceptForAll', true);
-        if (requireAcceptForAll) {
-            try {
-                const workspaceFolder = ((_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath) || '';
-                const relPath = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
-                const acceptedKey = `gitAutopush.aiAcceptedFor:${relPath}`;
-                const acceptedAtKey = `gitAutopush.aiAcceptedAt:${relPath}`;
-                const wasAccepted = context.workspaceState.get(acceptedKey, false);
-                if (!wasAccepted) {
-                    out.appendLine('git-autopush: requireAcceptForAll enabled and file not explicitly accepted — skipping auto-commit.');
-                    vscode.window.showInformationMessage('git-autopush: this workspace requires explicit acceptance before committing any changes. Use "Git AutoPush: Accept AI Suggestion" to accept for this file.');
-                    return;
-                }
-                // verify acceptance happened before the save
-                const acceptedAt = context.workspaceState.get(acceptedAtKey, 0);
-                const fs = require('fs');
-                const stat = fs.statSync(doc.uri.fsPath);
-                const mtime = stat.mtimeMs || stat.mtime.getTime();
-                if (!(acceptedAt && acceptedAt <= mtime)) {
-                    out.appendLine('git-autopush: file not saved after acceptance — skipping auto-commit until next save.');
-                    return;
-                }
-                // clear acceptance now that we'll commit
-                context.workspaceState.update(acceptedKey, false);
-                context.workspaceState.update(acceptedAtKey, 0);
-            }
-            catch (e) {
-                out.appendLine('git-autopush: requireAcceptForAll check failed — skipping as a safety measure.');
-                return;
-            }
         }
 
         // Basic safety checks: ensure inside git repo and file isn't ignored/sensitive
@@ -298,14 +248,14 @@ function activate(context) {
         async function presentSuggested(suggested) {
             if (review) {
                 const edited = await vscode.window.showInputBox({ value: suggested, prompt: 'Edit AI-generated commit message', ignoreFocusOut: true });
-                        if (typeof edited === 'string') {
-                            // Store a pending AI suggestion and require explicit accept before committing
-                            context.workspaceState.update('gitAutopush.aiPendingMessage', edited);
-                            context.workspaceState.update('gitAutopush.aiPendingFile', rel);
-                            context.workspaceState.update('gitAutopush.aiPendingAt', new Date().toISOString());
-                            context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', true);
-                            vscode.window.showInformationMessage('git-autopush: AI commit message pending. Use the "Git AutoPush: Accept AI Suggestion" command to accept and then save the file to commit.');
-                        }
+                if (typeof edited === 'string') {
+                    // Store a pending AI suggestion and require explicit accept before committing
+                    context.workspaceState.update('gitAutopush.aiPendingMessage', edited);
+                    context.workspaceState.update('gitAutopush.aiPendingFile', rel);
+                    context.workspaceState.update('gitAutopush.aiPendingAt', new Date().toISOString());
+                    context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', true);
+                    vscode.window.showInformationMessage('git-autopush: AI commit message pending. Use the "Git AutoPush: Accept AI Suggestion" command to accept and then save the file to commit.');
+                }
                 else {
                     vscode.window.showInformationMessage('git-autopush: message review cancelled.');
                 }
@@ -460,9 +410,7 @@ function activate(context) {
             return;
         }
         // Mark accepted for this file; commit will happen on next save
-        const ts = Date.now();
         context.workspaceState.update(`gitAutopush.aiAcceptedFor:${rel}`, true);
-        context.workspaceState.update(`gitAutopush.aiAcceptedAt:${rel}`, ts);
         context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', false);
         vscode.window.showInformationMessage('git-autopush: AI suggestion accepted — save the file to commit.');
         updateStatusBar();
