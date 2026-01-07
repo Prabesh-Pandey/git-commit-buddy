@@ -36,6 +36,18 @@
         "command": "git-autopush.pause",
         "title": "Git AutoPush: Pause/Resume"
       }
+      ,
+      {
+        "command": "git-autopush.saveAndRun",
+        "title": "Git AutoPush: Save & Run (Ctrl+S)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "git-autopush.saveAndRun",
+        "key": "ctrl+s",
+        "when": "editorTextFocus"
+      }
     ],
     "configuration": {
       "title": "Git AutoPush",
