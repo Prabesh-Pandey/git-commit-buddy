@@ -107,6 +107,18 @@
           "description": "API key for the selected AI provider. This key is stored machine-locally and not logged or synced.",
           "scope": "machine"
         },
+        "gitAutopush.ai.deepseekApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "(Optional) DeepSeek API key. If set, this overrides `gitAutopush.ai.apiKey` for DeepSeek calls.",
+          "scope": "machine"
+        },
+        "gitAutopush.ai.deepseekModel": {
+          "type": "string",
+          "default": "deepseek/deepseek-r1-0528:free",
+          "description": "DeepSeek model identifier to use for commit message generation.",
+          "scope": "machine"
+        },
         "gitAutopush.ai.generateCommitMessage": {
           "type": "boolean",
           "default": false,

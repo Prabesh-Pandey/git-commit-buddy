@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as minimatch from 'minimatch';
+import generateCommitMessage from './deepseek';
 
 export function activate(context: vscode.ExtensionContext) {
   // Note: read configuration inside the save handler so changes take effect immediately
@@ -9,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
   const terminal = vscode.window.createTerminal('git-autopush');
   const out = vscode.window.createOutputChannel('git-autopush-debug');
 
-  const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
+  const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
     // Read current configuration at save time so updates take effect immediately
     const config = vscode.workspace.getConfiguration('gitAutopush');
     const scriptPathCfg: string = config.get('scriptPath', '${workspaceFolder}/git-autopush.sh');
@@ -53,10 +54,48 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     const timestamp = new Date().toISOString();
-    const message = `Saved: ${path.basename(rel)}`;
+
+    // Attempt to generate a better commit message via DeepSeek if enabled.
+    // Fall back to a conservative "Saved: <file>" message when AI is disabled or fails.
+    let finalMessage = `Saved: ${path.basename(rel)}`;
+    try {
+      const aiEnabled: boolean = config.get('ai.generateCommitMessage', false) && config.get('ai.enabled', false);
+      if (aiEnabled) {
+        const deepseekApiKey: string = config.get('ai.deepseekApiKey', '') || config.get('ai.apiKey', '') || process.env.DEEPSEEK_API_KEY || '';
+        const deepseekModel: string = config.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
+
+        const fileText = doc.getText().slice(0, 2000); // limit size
+        const prompt = `File: ${rel}\n\nContents excerpt:\n${fileText}`;
+        const gen = await generateCommitMessage(prompt, { apiKey: deepseekApiKey || undefined, model: deepseekModel });
+
+        // Prompt the user to confirm/edit the generated subject
+        const subject = gen.subject || `Saved: ${path.basename(rel)}`;
+        const edited = await vscode.window.showInputBox({
+          prompt: 'Confirm commit subject',
+          value: subject,
+          placeHolder: 'Enter commit subject',
+          ignoreFocusOut: true,
+        });
+
+        if (typeof edited === 'undefined') {
+          // User cancelled the prompt – abort.
+          out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
+          return;
+        }
+
+        // Combine subject and body if present
+        finalMessage = edited.trim();
+        if (gen.body && gen.body.trim()) {
+          finalMessage += '\n\n' + gen.body.trim();
+        }
+      }
+    } catch (err: any) {
+      out.appendLine(`git-autopush: DeepSeek message generation failed: ${err?.message || String(err)}`);
+      out.appendLine('git-autopush: falling back to default message');
+    }
 
     const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
-    const cmd = `${quoted} -m "${message.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''}`;
+    const cmd = `${quoted} -m "${finalMessage.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''}`;
 
     out.appendLine(`git-autopush: running command -> ${cmd}`);
     out.show(true);
