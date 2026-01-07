@@ -58,6 +58,21 @@ function activate(context) {
             return;
         }
 
+        // If an AI-generated commit message is pending review, do NOT auto-apply it.
+        try {
+            const aiGenerate = config.get('ai.generateCommitMessage', false);
+            const aiReview = config.get('ai.reviewBeforeCommit', true);
+            const pendingAI = context.workspaceState.get('gitAutopush.lastAIMessage', null);
+            if (aiGenerate && aiReview && pendingAI) {
+                out.appendLine('git-autopush: AI-suggested commit message pending review — skipping auto-commit.');
+                vscode.window.showInformationMessage('git-autopush: AI commit message pending review — open Generate Commit Message to edit and Run Once to apply.');
+                return;
+            }
+        }
+        catch (e) {
+            // if anything goes wrong with AI checks, proceed with normal flow
+        }
+
         // If autoCommit is not enabled, skip.
         if (!autoCommit) {
             out.appendLine('git-autopush: autoCommit disabled — skipping.');
