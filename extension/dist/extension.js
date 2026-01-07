@@ -248,14 +248,14 @@ function activate(context) {
         async function presentSuggested(suggested) {
             if (review) {
                 const edited = await vscode.window.showInputBox({ value: suggested, prompt: 'Edit AI-generated commit message', ignoreFocusOut: true });
-                if (typeof edited === 'string') {
-                    // Store a pending AI suggestion and require explicit accept before committing
-                    context.workspaceState.update('gitAutopush.aiPendingMessage', edited);
-                    context.workspaceState.update('gitAutopush.aiPendingFile', rel);
-                    context.workspaceState.update('gitAutopush.aiPendingAt', new Date().toISOString());
-                    context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', true);
-                    vscode.window.showInformationMessage('git-autopush: AI commit message pending. Use the "Git AutoPush: Accept AI Suggestion" command to accept and then save the file to commit.');
-                }
+                        if (typeof edited === 'string') {
+                            // Store a pending AI suggestion and require explicit accept before committing
+                            context.workspaceState.update('gitAutopush.aiPendingMessage', edited);
+                            context.workspaceState.update('gitAutopush.aiPendingFile', rel);
+                            context.workspaceState.update('gitAutopush.aiPendingAt', new Date().toISOString());
+                            context.workspaceState.update('gitAutopush.aiAwaitingUserConfirmation', true);
+                            vscode.window.showInformationMessage('git-autopush: AI commit message pending. Use the "Git AutoPush: Accept AI Suggestion" command to accept and then save the file to commit.');
+                        }
                 else {
                     vscode.window.showInformationMessage('git-autopush: message review cancelled.');
                 }
