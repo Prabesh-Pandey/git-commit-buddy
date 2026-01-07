@@ -8,3 +8,4 @@ Notes:
 - Backup: readme.md.bak
 - Next step: run the command palette → "Git AutoPush: Set AI API Key (machine-local)" or set `DEEPSEEK_API_KEY` in the environment that launches VS Code.
   UPDATE READ ME
+  updare readme
