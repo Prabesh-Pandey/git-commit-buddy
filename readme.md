@@ -10,5 +10,8 @@ Notes:
   UPDATE READ ME
   updare readme
   new update in readme
-TEST_LINE: ai-commit test
-LIVE_TEST_LINE: installed-vsix test
+  TEST_LINE: ai-commit test
+  LIVE_TEST_LINE: installed-vsix test
+  test
+  ttt
+  test for ai ai ai

@@ -1,0 +1,7 @@
+[
+  {
+    "key": "ctrl+s",
+    "command": "git-autopush.saveAndRun",
+    "when": "editorTextFocus"
+  }
+]
