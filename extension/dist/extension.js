@@ -220,7 +220,17 @@ function activate(context) {
                     try {
                         const https = require('https');
                         const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line. Do NOT include surrounding quotes.`;
-                        const userPrompt = `Generate a commit message for the following changes:\n\nFile: ${rel}\n\nContents excerpt:\n${doc.getText().slice(0, 2000)}`;
+                        // Prefer sending the git diff for the file (more contextual) — fall back to a file excerpt.
+                        let diffText = '';
+                        try {
+                            diffText = require('child_process').execSync(`git diff --no-color --unified=3 -- ${rel}`, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+                        }
+                        catch (e) {
+                            diffText = doc.getText().slice(0, 2000);
+                        }
+                        // Truncate to avoid huge payloads
+                        if (diffText.length > 8000) diffText = diffText.slice(0, 8000) + '\n... (truncated)';
+                        const userPrompt = `Generate a commit message for the following changes (prefer diff):\n\nFile: ${rel}\n\nDiff / Excerpt:\n${diffText}`;
                         const payload = JSON.stringify({ model: deepseekModel, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] });
                         const urlOpts = { hostname: 'openrouter.ai', port: 443, path: '/api/v1/chat/completions', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': `Bearer ${deepseekKey}` } };
 
@@ -256,19 +266,28 @@ function activate(context) {
                         });
 
                         const rawText = (suggestedRaw || '').toString().trim();
-                        const subject = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean)[0] || `Saved: ${path.basename(rel)}`;
-                        const edited = await vscode.window.showInputBox({ prompt: 'Confirm commit subject', value: subject, placeHolder: 'Enter commit subject', ignoreFocusOut: true });
-                        if (typeof edited === 'undefined') {
-                            out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
-                            // user cancelled; abort AI flow
-                        } else {
-                            message = edited.trim();
-                            const parts = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean);
-                            if (parts.length > 1) {
-                                const body = parts.slice(1).join('\n\n');
-                                if (body) message += '\n\n' + body;
+                        const reviewBefore = config.get('ai.reviewBeforeCommit', true);
+                        if (!reviewBefore) {
+                            // Auto-apply the full DeepSeek reply as the commit message
+                            message = rawText || `Saved: ${path.basename(rel)}`;
+                            out.appendLine(`git-autopush: DeepSeek-generated message auto-applied (subject: ${message.split(/\n/)[0]})`);
+                        }
+                        else {
+                            const subject = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean)[0] || `Saved: ${path.basename(rel)}`;
+                            const edited = await vscode.window.showInputBox({ prompt: 'Confirm commit subject', value: subject, placeHolder: 'Enter commit subject', ignoreFocusOut: true });
+                            if (typeof edited === 'undefined') {
+                                out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
+                                // user cancelled; abort AI flow (message remains fallback)
                             }
-                            out.appendLine(`git-autopush: DeepSeek-generated message used (subject: ${message.split(/\n/)[0]})`);
+                            else {
+                                message = edited.trim();
+                                const parts = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean);
+                                if (parts.length > 1) {
+                                    const body = parts.slice(1).join('\n\n');
+                                    if (body) message += '\n\n' + body;
+                                }
+                                out.appendLine(`git-autopush: DeepSeek-generated message used (subject: ${message.split(/\n/)[0]})`);
+                            }
                         }
                     }
                     catch (err) {
