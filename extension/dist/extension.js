@@ -120,6 +120,39 @@ function activate(context) {
             return;
         }
 
+        // Optional safety: if configured, require explicit acceptance for ALL commits (not just extension-generated suggestions).
+        const requireAcceptForAll = config.get('requireAcceptForAll', true);
+        if (requireAcceptForAll) {
+            try {
+                const workspaceFolder = ((_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath) || '';
+                const relPath = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
+                const acceptedKey = `gitAutopush.aiAcceptedFor:${relPath}`;
+                const acceptedAtKey = `gitAutopush.aiAcceptedAt:${relPath}`;
+                const wasAccepted = context.workspaceState.get(acceptedKey, false);
+                if (!wasAccepted) {
+                    out.appendLine('git-autopush: requireAcceptForAll enabled and file not explicitly accepted — skipping auto-commit.');
+                    vscode.window.showInformationMessage('git-autopush: this workspace requires explicit acceptance before committing any changes. Use "Git AutoPush: Accept AI Suggestion" to accept for this file.');
+                    return;
+                }
+                // verify acceptance happened before the save
+                const acceptedAt = context.workspaceState.get(acceptedAtKey, 0);
+                const fs = require('fs');
+                const stat = fs.statSync(doc.uri.fsPath);
+                const mtime = stat.mtimeMs || stat.mtime.getTime();
+                if (!(acceptedAt && acceptedAt <= mtime)) {
+                    out.appendLine('git-autopush: file not saved after acceptance — skipping auto-commit until next save.');
+                    return;
+                }
+                // clear acceptance now that we'll commit
+                context.workspaceState.update(acceptedKey, false);
+                context.workspaceState.update(acceptedAtKey, 0);
+            }
+            catch (e) {
+                out.appendLine('git-autopush: requireAcceptForAll check failed — skipping as a safety measure.');
+                return;
+            }
+        }
+
         // Basic safety checks: ensure inside git repo and file isn't ignored/sensitive
         let repoRoot = '';
         try {
