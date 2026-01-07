@@ -35,13 +35,49 @@ function activate(context) {
     // Note: read configuration inside the save handler so changes take effect immediately
     const terminal = vscode.window.createTerminal('git-autopush');
     const out = vscode.window.createOutputChannel('git-autopush-debug');
+    // In-memory nonces for trigger tokens; stored here so external processes can't set them.
+    const triggerNonces = new Map();
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
         var _a, _b;
+        // Only act on saves triggered via our save-and-run keybinding.
+        const token = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
+        if (!token || !token.path) {
+            out.appendLine(`git-autopush: no trigger token set — ignoring save: ${doc.uri.fsPath}`);
+            return;
+        }
+        const now = Date.now();
+        if (!token.expires || token.expires < now) {
+            out.appendLine(`git-autopush: trigger token expired for ${token.path} (now=${now}, expires=${token.expires})`);
+            await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+            return;
+        }
+        if (token.path !== doc.uri.fsPath) {
+            out.appendLine(`git-autopush: trigger token path mismatch (token=${token.path}) — save for ${doc.uri.fsPath} ignored`);
+            return;
+        }
+        // validate nonce
+        try {
+            const expectedNonce = token.nonce || null;
+            const currentNonce = triggerNonces.get(doc.uri.fsPath) || null;
+            if (!expectedNonce || !currentNonce || expectedNonce !== currentNonce) {
+                out.appendLine(`git-autopush: nonce mismatch or missing for ${doc.uri.fsPath} (expected=${expectedNonce}, current=${currentNonce})`);
+                return;
+            }
+            // consume token and nonce
+            await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
+            triggerNonces.delete(doc.uri.fsPath);
+        }
+        catch (e) {
+            out.appendLine('git-autopush: nonce validation failed — ignoring save');
+            return;
+        }
         // Read current configuration at save time so updates take effect immediately
         const config = vscode.workspace.getConfiguration('gitAutopush');
         const scriptPathCfg = config.get('scriptPath', '${workspaceFolder}/git-autopush.sh');
         const globs = config.get('watchGlobs', ['**/*.{py,js,ts,md,json,txt}']);
         const dryRun = config.get('dryRun', true);
+        const autoCommit = config.get('autoCommit', false);
+        const autoPush = config.get('autoPush', false);
         const workspaceFolder = ((_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath) || '';
         const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
         // check globs
@@ -55,60 +91,52 @@ function activate(context) {
         if (!matched) {
             return;
         }
-        // Aggressively expand vars and normalize script path
+        if (!autoCommit) {
+            out.appendLine('git-autopush: autoCommit disabled — skipping.');
+            return;
+        }
+        // Prepare script path resolution (same as before)
         let scriptPath = scriptPathCfg || '';
         if (workspaceFolder) {
             scriptPath = scriptPath.replace(/\$\{workspaceFolder(:[^}]+)?\}/g, workspaceFolder);
             scriptPath = scriptPath.replace(/\$\{workspaceRoot(:[^}]+)?\}/g, workspaceFolder);
         }
-        // Expand environment variables like $HOME
         scriptPath = scriptPath.replace(/\$HOME/g, process.env.HOME || '');
-        // Expand ~ to home
         if (scriptPath.startsWith('~')) {
             scriptPath = path.join(process.env.HOME || '', scriptPath.slice(1));
         }
-        // If still contains ${...} patterns, strip them
         scriptPath = scriptPath.replace(/\$\{[^}]+\}/g, '');
-        // If relative, resolve against workspace
         if (!path.isAbsolute(scriptPath) && workspaceFolder) {
             scriptPath = path.resolve(workspaceFolder, scriptPath);
         }
-        // Fallback: if resolved path doesn't exist, try common workspace location
         if (!require('fs').existsSync(scriptPath)) {
             const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
             if (require('fs').existsSync(fallback)) {
                 scriptPath = fallback;
             }
         }
-        const timestamp = new Date().toISOString();
-        // Attempt to generate a better commit message via DeepSeek if enabled.
-        // Fall back to a conservative "Saved: <file>" message when AI is disabled or fails.
+        // Default message fallback
         let finalMessage = `Saved: ${path.basename(rel)}`;
         try {
-            const aiEnabled = config.get('ai.generateCommitMessage', false) && config.get('ai.enabled', false);
-            if (aiEnabled) {
+            const aiEnabled = config.get('ai.enabled', false);
+            const generate = config.get('ai.generateCommitMessage', false);
+            if (aiEnabled && generate) {
                 const deepseekApiKey = config.get('ai.deepseekApiKey', '') || config.get('ai.apiKey', '') || process.env.DEEPSEEK_API_KEY || '';
                 const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
-                const fileText = doc.getText().slice(0, 2000); // limit size
-                const prompt = `File: ${rel}\n\nContents excerpt:\n${fileText}`;
-                const gen = await (0, deepseek_1.default)(prompt, { apiKey: deepseekApiKey || undefined, model: deepseekModel });
-                // Prompt the user to confirm/edit the generated subject
-                const subject = gen.subject || `Saved: ${path.basename(rel)}`;
-                const edited = await vscode.window.showInputBox({
-                    prompt: 'Confirm commit subject',
-                    value: subject,
-                    placeHolder: 'Enter commit subject',
-                    ignoreFocusOut: true,
-                });
-                if (typeof edited === 'undefined') {
-                    // User cancelled the prompt – abort.
-                    out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
-                    return;
-                }
-                // Combine subject and body if present
-                finalMessage = edited.trim();
-                if (gen.body && gen.body.trim()) {
-                    finalMessage += '\n\n' + gen.body.trim();
+                if (deepseekApiKey) {
+                    const fileText = doc.getText().slice(0, 2000);
+                    const prompt = `File: ${rel}\n\nContents excerpt:\n${fileText}`;
+                    const gen = await (0, deepseek_1.default)(prompt, { apiKey: deepseekApiKey || undefined, model: deepseekModel });
+                    const subject = gen.subject || `Saved: ${path.basename(rel)}`;
+                    const edited = await vscode.window.showInputBox({ prompt: 'Confirm commit subject', value: subject, placeHolder: 'Enter commit subject', ignoreFocusOut: true });
+                    if (typeof edited === 'undefined') {
+                        out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
+                        return;
+                    }
+                    finalMessage = edited.trim();
+                    if (gen.body && gen.body.trim()) {
+                        finalMessage += '\n\n' + gen.body.trim();
+                    }
                 }
             }
         }
@@ -117,13 +145,30 @@ function activate(context) {
             out.appendLine('git-autopush: falling back to default message');
         }
         const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
-        const cmd = `${quoted} -m "${finalMessage.replace(/"/g, '\\"')}" ${dryRun ? '-n' : ''}`;
+        const noPushFlag = autoPush ? '' : '-P';
+        const cmd = `${quoted} ${noPushFlag} ${dryRun ? '-n' : ''} -m "${finalMessage.replace(/"/g, '\\"')}"`.trim();
         out.appendLine(`git-autopush: running command -> ${cmd}`);
         out.show(true);
         terminal.show(true);
         terminal.sendText(cmd, true);
     });
     context.subscriptions.push(onSave);
+    // Save & Run command (sets ephemeral token + nonce then saves)
+    const saveAndRun = vscode.commands.registerCommand('git-autopush.saveAndRun', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            await vscode.commands.executeCommand('workbench.action.files.save');
+            return;
+        }
+        const docPath = editor.document.uri.fsPath;
+        const expires = Date.now() + 5000;
+        const nonce = Math.random().toString(36).slice(2);
+        await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', { path: docPath, nonce, expires });
+        triggerNonces.set(docPath, nonce);
+        out.appendLine(`git-autopush: saveAndRun token set for ${docPath} (expires=${expires}, nonce=${nonce})`);
+        await vscode.commands.executeCommand('workbench.action.files.save');
+    });
+    context.subscriptions.push(saveAndRun);
 }
 exports.activate = activate;
 function deactivate() { }

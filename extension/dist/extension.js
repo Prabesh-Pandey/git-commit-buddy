@@ -185,77 +185,101 @@ function activate(context) {
         }
         const timestamp = new Date().toISOString();
 
-        // Attempt AI-generated commit message if configured and available.
+        // Default message fallback
         let message = `Saved: ${path.basename(rel)}`;
+
+        // Attempt AI-generated commit message if configured and available.
         try {
             const aiEnabled = config.get('ai.enabled', false);
             const generate = config.get('ai.generateCommitMessage', false);
             const provider = config.get('ai.provider', 'deepseek');
-            const deepseekKey = config.get('ai.deepseekApiKey', '') || config.get('ai.apiKey', '') || process.env.DEEPSEEK_API_KEY || '';
+            let deepseekKey = config.get('ai.deepseekApiKey', '') || config.get('ai.apiKey', '') || process.env.DEEPSEEK_API_KEY || '';
             const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
 
-            if (aiEnabled && generate && provider === 'deepseek' && deepseekKey) {
-                out.appendLine('git-autopush: attempting DeepSeek generation for commit message...');
-                // Prepare prompt (brief excerpt)
-                const bodyText = doc.getText().slice(0, 2000);
-                const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line. Do NOT include surrounding quotes.`;
-                const userPrompt = `Generate a commit message for the following changes:\n\nFile: ${rel}\n\nContents excerpt:\n${bodyText}`;
-
-                // Call OpenRouter / DeepSeek chat completions endpoint
-                const https = require('https');
-                const payload = JSON.stringify({ model: deepseekModel, messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt } ] });
-                const reqOpts = {
-                    hostname: 'openrouter.ai',
-                    port: 443,
-                    path: '/api/v1/chat/completions',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Content-Length': Buffer.byteLength(payload),
-                        'Authorization': `Bearer ${deepseekKey}`
+            if (aiEnabled && generate && provider === 'deepseek') {
+                if (!deepseekKey) {
+                    // Ask user for key and store machine-local
+                    try {
+                        const entered = await vscode.window.showInputBox({ prompt: 'DeepSeek API key not found. Enter API key to enable AI-generated commit messages (stored machine-local)', ignoreFocusOut: true, password: true });
+                        if (typeof entered === 'string' && entered.trim()) {
+                            await config.update('ai.apiKey', entered.trim(), vscode.ConfigurationTarget.Machine);
+                            deepseekKey = entered.trim();
+                            out.appendLine('git-autopush: DeepSeek API key saved (machine-local)');
+                        }
+                        else {
+                            out.appendLine('git-autopush: no DeepSeek API key provided — falling back to default message');
+                        }
                     }
-                };
+                    catch (err) {
+                        out.appendLine('git-autopush: failed to save DeepSeek API key: ' + (err?.message || String(err)));
+                    }
+                }
 
-                const suggestedRaw = await new Promise((resolve, reject) => {
-                    const req = https.request(reqOpts, (res) => {
-                        let data = '';
-                        res.on('data', (chunk) => data += chunk);
-                        res.on('end', () => {
-                            try {
-                                const parsed = JSON.parse(data || '{}');
-                                const raw = parsed?.choices?.[0]?.message?.content ?? parsed?.result?.content ?? JSON.stringify(parsed);
-                                resolve(raw);
-                            }
-                            catch (e) { reject(e); }
+                if (deepseekKey) {
+                    out.appendLine('git-autopush: attempting DeepSeek generation for commit message...');
+                    try {
+                        const https = require('https');
+                        const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line. Do NOT include surrounding quotes.`;
+                        const userPrompt = `Generate a commit message for the following changes:\n\nFile: ${rel}\n\nContents excerpt:\n${doc.getText().slice(0, 2000)}`;
+                        const payload = JSON.stringify({ model: deepseekModel, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] });
+                        const urlOpts = { hostname: 'openrouter.ai', port: 443, path: '/api/v1/chat/completions', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': `Bearer ${deepseekKey}` } };
+
+                        const suggestedRaw = await new Promise((resolve, reject) => {
+                            const req = https.request(urlOpts, (res) => {
+                                let data = '';
+                                res.on('data', (c) => data += c);
+                                res.on('end', () => {
+                                    try {
+                                        const json = JSON.parse(data || '{}');
+                                        const candidates = [];
+                                        if (json.choices && Array.isArray(json.choices)) {
+                                            try { candidates.push(json.choices[0].message.content); } catch (e) { }
+                                            try { candidates.push(json.choices[0].text); } catch (e) { }
+                                        }
+                                        if (json.output && Array.isArray(json.output)) {
+                                            try { candidates.push(json.output[0].content); } catch (e) { }
+                                        }
+                                        try { candidates.push(json.commit_message); } catch (e) { }
+                                        try { candidates.push(json.message); } catch (e) { }
+                                        try { candidates.push(json.result); } catch (e) { }
+                                        for (const k of Object.keys(json)) { if (typeof json[k] === 'string') candidates.push(json[k]); }
+                                        const raw = candidates.find(c => typeof c === 'string' && c.trim().length > 0) ?? JSON.stringify(json);
+                                        resolve(raw);
+                                    }
+                                    catch (e) { reject(e); }
+                                });
+                            });
+                            req.on('error', (e) => reject(e));
+                            req.setTimeout(15000, () => { req.destroy(new Error('DeepSeek request timeout')); });
+                            req.write(payload);
+                            req.end();
                         });
-                    });
-                    req.on('error', (e) => reject(e));
-                    req.setTimeout(15000, () => { req.destroy(new Error('DeepSeek request timeout')); });
-                    req.write(payload);
-                    req.end();
-                });
 
-                const rawText = (suggestedRaw || '').toString().trim();
-                let subject = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean)[0] || `Saved: ${path.basename(rel)}`;
-
-                // Prompt user to confirm/edit subject
-                const edited = await vscode.window.showInputBox({ prompt: 'Confirm commit subject', value: subject, placeHolder: 'Enter commit subject', ignoreFocusOut: true });
-                if (typeof edited === 'undefined') {
-                    out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
-                    return;
+                        const rawText = (suggestedRaw || '').toString().trim();
+                        const subject = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean)[0] || `Saved: ${path.basename(rel)}`;
+                        const edited = await vscode.window.showInputBox({ prompt: 'Confirm commit subject', value: subject, placeHolder: 'Enter commit subject', ignoreFocusOut: true });
+                        if (typeof edited === 'undefined') {
+                            out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
+                            // user cancelled; abort AI flow
+                        } else {
+                            message = edited.trim();
+                            const parts = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean);
+                            if (parts.length > 1) {
+                                const body = parts.slice(1).join('\n\n');
+                                if (body) message += '\n\n' + body;
+                            }
+                            out.appendLine(`git-autopush: DeepSeek-generated message used (subject: ${message.split(/\n/)[0]})`);
+                        }
+                    }
+                    catch (err) {
+                        out.appendLine(`git-autopush: DeepSeek generation failed: ${err?.message || String(err)}`);
+                        out.appendLine('git-autopush: falling back to default message');
+                    }
                 }
-
-                message = edited.trim();
-                const parts = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean);
-                if (parts.length > 1) {
-                    const body = parts.slice(1).join('\n\n');
-                    if (body) message += '\n\n' + body;
-                }
-                out.appendLine(`git-autopush: DeepSeek-generated message used (subject: ${message.split(/\n/)[0]})`);
             }
         }
         catch (e) {
-            out.appendLine(`git-autopush: DeepSeek generation failed: ${e?.message || String(e)}`);
+            out.appendLine(`git-autopush: DeepSeek outer failure: ${e?.message || String(e)}`);
             out.appendLine('git-autopush: falling back to default message');
         }
         const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
@@ -413,6 +437,70 @@ function activate(context) {
         await presentSuggested(fallback);
     });
     context.subscriptions.push(generateMessageCmd);
+
+    const debugDeepseekCmd = vscode.commands.registerCommand('git-autopush.debugDeepseek', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showWarningMessage('git-autopush: no active editor');
+            return;
+        }
+        const doc = editor.document;
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const aiEnabled = cfg.get('ai.enabled', false);
+        const generate = cfg.get('ai.generateCommitMessage', false);
+        const provider = cfg.get('ai.provider', 'deepseek');
+        const key = cfg.get('ai.deepseekApiKey', '') || cfg.get('ai.apiKey', '') || process.env.DEEPSEEK_API_KEY || '';
+        const model = cfg.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
+
+        if (!aiEnabled || !generate) {
+            vscode.window.showInformationMessage('git-autopush: AI commit generation is disabled (enable via settings).');
+            return;
+        }
+        if (provider !== 'deepseek') {
+            vscode.window.showInformationMessage('git-autopush: provider is not set to deepseek.');
+            return;
+        }
+        if (!key) {
+            vscode.window.showWarningMessage('git-autopush: DeepSeek API key not configured. Use the Set AI API Key command or set DEEPSEEK_API_KEY.');
+            return;
+        }
+
+        out.appendLine('git-autopush: Debug DeepSeek — sending raw request...');
+        out.show(true);
+
+        try {
+            const https = require('https');
+            const rel = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? path.relative(vscode.workspace.workspaceFolders[0].uri.fsPath, doc.uri.fsPath) : doc.uri.fsPath;
+            const bodyText = doc.getText().slice(0, 2000);
+            const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line.`;
+            const userPrompt = `Generate a commit message for the following changes:\n\nFile: ${rel}\n\nContents excerpt:\n${bodyText}`;
+            const payload = JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] });
+            const urlOpts = { hostname: 'openrouter.ai', port: 443, path: '/api/v1/chat/completions', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': `Bearer ${key}` } };
+
+            const raw = await new Promise((resolve, reject) => {
+                const req = https.request(urlOpts, (res) => {
+                    let data = '';
+                    res.on('data', (c) => data += c);
+                    res.on('end', () => resolve(data));
+                });
+                req.on('error', reject);
+                req.setTimeout(15000, () => { req.destroy(new Error('DeepSeek request timeout')); });
+                req.write(payload);
+                req.end();
+            });
+
+            let parsed;
+            try { parsed = JSON.parse(raw); } catch (e) { parsed = raw; }
+            out.appendLine('git-autopush: DeepSeek raw response:');
+            out.appendLine(typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2));
+            vscode.window.showInformationMessage('git-autopush: DeepSeek raw response written to debug output.');
+        }
+        catch (e) {
+            out.appendLine('git-autopush: DeepSeek debug call failed: ' + (e?.message || String(e)));
+            vscode.window.showErrorMessage('git-autopush: DeepSeek debug call failed. See debug output.');
+        }
+    });
+    context.subscriptions.push(debugDeepseekCmd);
 
     const pauseCmd = vscode.commands.registerCommand('git-autopush.pause', async () => {
         const cfg = vscode.workspace.getConfiguration('gitAutopush');

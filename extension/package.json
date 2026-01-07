@@ -29,6 +29,10 @@
         "title": "Git AutoPush: Generate Commit Message (AI)"
       },
       {
+        "command": "git-autopush.debugDeepseek",
+        "title": "Git AutoPush: Debug DeepSeek Response"
+      },
+      {
         "command": "git-autopush.runOnce",
         "title": "Git AutoPush: Run Once Now"
       },
@@ -142,6 +146,8 @@
     "onCommand:git-autopush.toggleAutoCommit",
     "onCommand:git-autopush.toggleAutoPush",
     "onCommand:git-autopush.runOnce",
+    "onCommand:git-autopush.saveAndRun",
+    "onCommand:git-autopush.debugDeepseek",
     "onCommand:git-autopush.pause"
   ],
   "main": "./dist/extension.js",
