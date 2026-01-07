@@ -161,11 +161,26 @@ function activate(context) {
         if (!path.isAbsolute(scriptPath) && workspaceFolder) {
             scriptPath = path.resolve(workspaceFolder, scriptPath);
         }
-        // Fallback: if resolved path doesn't exist, try common workspace location
+        // Fallback behavior: if resolved path doesn't exist, try and use a global script.
         if (!require('fs').existsSync(scriptPath)) {
-            const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
-            if (require('fs').existsSync(fallback)) {
-                scriptPath = fallback;
+            // 1) Check environment variable GITAUTOPUSH_SCRIPT
+            const envPath = process.env.GITAUTOPUSH_SCRIPT || '';
+            if (envPath && require('fs').existsSync(envPath)) {
+                scriptPath = envPath;
+            }
+            else {
+                // 2) Check user's Per/Scripts common location
+                const homeFallback = path.join(process.env.HOME || '', 'Per', 'Scripts', 'git-autopush.sh');
+                if (require('fs').existsSync(homeFallback)) {
+                    scriptPath = homeFallback;
+                }
+                else {
+                    // 3) Fall back to workspace-local fallback as before
+                    const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
+                    if (require('fs').existsSync(fallback)) {
+                        scriptPath = fallback;
+                    }
+                }
             }
         }
         const timestamp = new Date().toISOString();
@@ -429,9 +444,21 @@ function activate(context) {
             scriptPath = path.resolve(workspaceFolder, scriptPath);
         }
         if (!require('fs').existsSync(scriptPath)) {
-            const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
-            if (require('fs').existsSync(fallback)) {
-                scriptPath = fallback;
+            const envPath = process.env.GITAUTOPUSH_SCRIPT || '';
+            if (envPath && require('fs').existsSync(envPath)) {
+                scriptPath = envPath;
+            }
+            else {
+                const homeFallback = path.join(process.env.HOME || '', 'Per', 'Scripts', 'git-autopush.sh');
+                if (require('fs').existsSync(homeFallback)) {
+                    scriptPath = homeFallback;
+                }
+                else {
+                    const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
+                    if (require('fs').existsSync(fallback)) {
+                        scriptPath = fallback;
+                    }
+                }
             }
         }
 
