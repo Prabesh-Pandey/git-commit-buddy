@@ -246,7 +246,7 @@ function activate(context) {
         const aiEnabled = cfg.get('ai.enabled', false);
         const generate = cfg.get('ai.generateCommitMessage', false);
         const review = cfg.get('ai.reviewBeforeCommit', true);
-        const provider = cfg.get('ai.provider', 'openai');
+        const provider = cfg.get('ai.provider', 'deepseek');
         const apiKey = cfg.get('ai.apiKey', '');
         const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
         const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
@@ -277,72 +277,8 @@ function activate(context) {
             updateStatusBar();
         }
 
-        // If provider is openai and we have an API key, attempt a network call
-        if (provider === 'openai' && apiKey && apiKey.length > 0) {
-            out.appendLine('git-autopush: contacting AI provider to generate message...');
-            try {
-                const https = require('https');
-                const bodyText = doc.getText().slice(0, 2000); // limit size
-                const prompt = `You are a concise commit message generator. Summarize the primary change(s) in the following file content in one short imperative sentence (max 72 chars):\n\nFilename: ${path.basename(rel)}\n\nContent:\n${bodyText}`;
-                const postData = JSON.stringify({
-                    model: 'gpt-3.5-turbo',
-                    messages: [
-                        { role: 'system', content: 'You generate short, clear git commit messages.' },
-                        { role: 'user', content: prompt }
-                    ],
-                    max_tokens: 60,
-                    temperature: 0.2
-                });
-                const reqOpts = {
-                    hostname: 'api.openai.com',
-                    port: 443,
-                    path: '/v1/chat/completions',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Content-Length': Buffer.byteLength(postData),
-                        'Authorization': `Bearer ${apiKey}`
-                    }
-                };
-                const suggested = await new Promise((resolve, reject) => {
-                    const req = https.request(reqOpts, (res) => {
-                        let data = '';
-                        res.on('data', (chunk) => data += chunk);
-                        res.on('end', () => {
-                            try {
-                                const parsed = JSON.parse(data);
-                                const text = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].message && parsed.choices[0].message.content;
-                                if (text && typeof text === 'string') {
-                                    resolve(text.trim());
-                                }
-                                else {
-                                    reject(new Error('No message in AI response'));
-                                }
-                            }
-                            catch (e) {
-                                reject(e);
-                            }
-                        });
-                    });
-                    req.on('error', (e) => reject(e));
-                    req.setTimeout(10000, () => { req.destroy(new Error('AI request timeout')); });
-                    req.write(postData);
-                    req.end();
-                });
-                // sanitize suggested to one-line commit-like text
-                const oneLine = suggested.split(/\r?\n/)[0].trim();
-                const finalMsg = oneLine.length > 0 ? oneLine : fallback;
-                out.appendLine(`git-autopush: AI suggested (truncated): ${finalMsg}`);
-                await presentSuggested(finalMsg);
-                return;
-            }
-            catch (e) {
-                out.appendLine('git-autopush: AI provider call failed — falling back.');
-            }
-        }
-        // Fallback deterministic message
-        await presentSuggested(fallback);
-    
+        // Fallback deterministic message (used if DeepSeek is unavailable)
+        // We'll attempt DeepSeek below; if it fails we'll present the fallback.
         // If provider is deepseek and configured, attempt DeepSeek call
         if (provider === 'deepseek' && apiKey && apiKey.length > 0) {
             out.appendLine('git-autopush: contacting DeepSeek provider to generate message...');
