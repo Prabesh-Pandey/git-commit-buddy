@@ -11,3 +11,4 @@ Notes:
   updare readme
   new update in readme
 TEST_LINE: ai-commit test
+LIVE_TEST_LINE: installed-vsix test

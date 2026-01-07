@@ -56,6 +56,8 @@ function activate(context) {
             return;
         }
         out.appendLine(`git-autopush: valid trigger token matched for ${doc.uri.fsPath}`);
+        // Mark that this save was triggered by the guarded Save+Run keybinding
+        const triggeredBySaveKey = true;
         // Validate in-memory nonce to ensure only our process set the token
         try {
             const expectedNonce = token.nonce || null;
@@ -220,13 +222,26 @@ function activate(context) {
                     try {
                         const https = require('https');
                         const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line. Do NOT include surrounding quotes.`;
-                        // Prefer sending the git diff for the file (more contextual) — fall back to a file excerpt.
+                        // For Save+Run we want the exact same behavior as the helper script:
+                        // 1) stage all changes, 2) send the staged diff (git diff --cached) to DeepSeek.
+                        // Fallback to a file diff or excerpt if staging/diffing fails.
                         let diffText = '';
                         try {
-                            diffText = require('child_process').execSync(`git diff --no-color --unified=3 -- ${rel}`, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+                            try {
+                                require('child_process').execSync('git add -A', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] });
+                            }
+                            catch (e) {
+                                // ignore staging errors
+                            }
+                            diffText = require('child_process').execSync('git diff --cached --no-color --unified=3', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
                         }
                         catch (e) {
-                            diffText = doc.getText().slice(0, 2000);
+                            try {
+                                diffText = require('child_process').execSync(`git diff --no-color --unified=3 -- ${rel}`, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+                            }
+                            catch (e2) {
+                                diffText = doc.getText().slice(0, 2000);
+                            }
                         }
                         // Truncate to avoid huge payloads
                         if (diffText.length > 8000) diffText = diffText.slice(0, 8000) + '\n... (truncated)';
@@ -266,7 +281,12 @@ function activate(context) {
                         });
 
                         const rawText = (suggestedRaw || '').toString().trim();
-                        const reviewBefore = config.get('ai.reviewBeforeCommit', true);
+                        // If this save was triggered by the guarded Save+Run flow, auto-apply the full AI reply
+                        // to match the helper script behavior. Otherwise respect the configured review setting.
+                        let reviewBefore = config.get('ai.reviewBeforeCommit', true);
+                        if (typeof triggeredBySaveKey !== 'undefined' && triggeredBySaveKey) {
+                            reviewBefore = false;
+                        }
                         if (!reviewBefore) {
                             // Auto-apply the full DeepSeek reply as the commit message
                             message = rawText || `Saved: ${path.basename(rel)}`;
