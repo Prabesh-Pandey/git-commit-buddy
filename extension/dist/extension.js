@@ -304,25 +304,28 @@ function activate(context) {
                                         }
                                         // Priority order for OpenRouter/DeepSeek response formats
                                         const candidates = [];
-                                        // 1. Standard OpenAI/OpenRouter format (highest priority)
+                                        // 1. DeepSeek R1 reasoning field (highest priority for R1 models)
+                                        if (json.choices && Array.isArray(json.choices) && json.choices.length > 0) {
+                                            try { 
+                                                const reasoning = json.choices[0].message?.reasoning;
+                                                if (reasoning && typeof reasoning === 'string') candidates.push(reasoning);
+                                            } catch (e) { }
+                                        }
+                                        // 2. Standard OpenAI/OpenRouter content format
                                         if (json.choices && Array.isArray(json.choices) && json.choices.length > 0) {
                                             try { 
                                                 const content = json.choices[0].message?.content || json.choices[0].text;
-                                                if (content) candidates.push(content); 
+                                                if (content && typeof content === 'string') candidates.push(content); 
                                             } catch (e) { }
                                         }
-                                        // 2. Alternative output formats
+                                        // 3. Alternative output formats
                                         if (json.output && Array.isArray(json.output)) {
                                             try { candidates.push(json.output[0].content); } catch (e) { }
                                         }
-                                        // 3. Direct message fields
+                                        // 4. Direct message fields
                                         try { if (json.commit_message) candidates.push(json.commit_message); } catch (e) { }
                                         try { if (json.message) candidates.push(json.message); } catch (e) { }
                                         try { if (json.result) candidates.push(json.result); } catch (e) { }
-                                        // 4. Last resort: scan all string fields
-                                        for (const k of Object.keys(json)) { 
-                                            if (typeof json[k] === 'string' && json[k].trim().length > 10) candidates.push(json[k]); 
-                                        }
                                         const raw = candidates.find(c => typeof c === 'string' && c.trim().length > 0);
                                         out.appendLine(`git-autopush: DeepSeek extracted content: ${raw ? raw.slice(0, 200) : 'NONE'}`);
                                         if (!raw) {
