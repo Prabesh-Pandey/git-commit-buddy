@@ -321,15 +321,30 @@ function activate(context) {
             out.appendLine(`git-autopush: DeepSeek outer failure: ${e?.message || String(e)}`);
             out.appendLine('git-autopush: falling back to default message');
         }
-        const quoted = `"${scriptPath.replace(/"/g, '\\"')}"`;
-        // If autoPush is false, instruct script to commit only (use --no-push / -P)
-        const noPushFlag = autoPush ? '' : '-P';
-        // Place the no-push flag immediately after the script path to avoid order sensitivity
-        const cmd = `${quoted} ${noPushFlag} ${dryRun ? '-n' : ''} -m "${message.replace(/"/g, '\\"')}"`.trim();
-        out.appendLine(`git-autopush: running command -> ${cmd}`);
+        // Build git commands directly so we don't require a project-level git-autopush.sh
+        const commitMsgEsc = message.replace(/"/g, '\\"');
+        const gitCmds = [];
+        gitCmds.push('git add -A');
+        gitCmds.push(`git commit -m "${commitMsgEsc}" || echo \"git-autopush: nothing to commit\"`);
+        if (!dryRun && autoPush) {
+            const remote = 'origin';
+            try {
+                // ensure branch is set (from earlier branch resolution)
+            }
+            catch (e) { }
+            gitCmds.push(`git push ${remote} ${branch}`);
+        }
+        const cwdPrefix = workspaceFolder ? `cd "${workspaceFolder.replace(/"/g, '\\"')}" && ` : '';
+        const fullCmd = cwdPrefix + gitCmds.join(' && ');
+        out.appendLine(`git-autopush: running git -> ${fullCmd}`);
         out.show(true);
         terminal.show(true);
-        terminal.sendText(cmd, true);
+        if (!dryRun) {
+            terminal.sendText(fullCmd, true);
+        }
+        else {
+            out.appendLine('git-autopush: dryRun enabled — not executing git commands');
+        }
     });
     context.subscriptions.push(onSave);
 
