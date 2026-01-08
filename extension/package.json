@@ -108,14 +108,15 @@
         "gitAutopush.ai.apiKey": {
           "type": "string",
           "default": "",
-          "description": "API key for the selected AI provider. This key is stored machine-locally and not logged or synced.",
+          "description": "OpenRouter API key for DeepSeek. Get yours at https://openrouter.ai/keys. Stored machine-locally (never synced or logged). Format: sk-or-v1-...",
           "scope": "machine"
         },
         "gitAutopush.ai.deepseekApiKey": {
           "type": "string",
           "default": "",
-          "description": "(Optional) DeepSeek API key. If set, this overrides `gitAutopush.ai.apiKey` for DeepSeek calls.",
-          "scope": "machine"
+          "description": "[DEPRECATED] Use gitAutopush.ai.apiKey instead. This setting is kept for backward compatibility only.",
+          "scope": "machine",
+          "deprecationMessage": "Use gitAutopush.ai.apiKey instead"
         },
         "gitAutopush.ai.deepseekModel": {
           "type": "string",
@@ -152,10 +153,10 @@
   ],
   "main": "./dist/extension.js",
   "scripts": {
-    "vscode:prepublish": "npm run build",
-    "compile": "tsc -p ./",
-    "build": "npm run compile",
-    "watch": "tsc -watch -p ./"
+    "vscode:prepublish": "echo 'Using pre-compiled JavaScript runtime'",
+    "compile": "echo 'Using pre-compiled JavaScript runtime'",
+    "build": "echo 'Using pre-compiled JavaScript runtime'",
+    "watch": "echo 'Using pre-compiled JavaScript runtime'"
   },
   "devDependencies": {
     "typescript": "^4.4.3",
