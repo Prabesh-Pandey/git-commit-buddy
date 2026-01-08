@@ -237,7 +237,12 @@ function activate(context) {
                     out.appendLine('git-autopush: attempting DeepSeek generation for commit message...');
                     try {
                         const https = require('https');
-                        const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line. Do NOT include surrounding quotes.`;
+                        const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. 
+CRITICAL: Your final answer MUST be ONLY a short commit message (max 50 chars for subject line).
+Format: 
+- First line: short subject (imperative mood, no period)
+- Optional: blank line then brief body (max 72 chars per line)
+Do NOT include quotes, explanations, or analysis. Just the commit message itself.`;
                         // For Save+Run we want the exact same behavior as the helper script:
                         // 1) stage all changes, 2) send the staged diff (git diff --cached) to DeepSeek.
                         // Fallback to a file diff or excerpt if staging/diffing fails.
@@ -331,7 +336,37 @@ function activate(context) {
                                         if (!raw) {
                                             return reject(new Error(`DeepSeek response missing content: ${JSON.stringify(json).slice(0, 200)}`));
                                         }
-                                        resolve(raw);
+                                        // For DeepSeek R1 reasoning field: extract concise commit message from verbose reasoning
+                                        // Look for patterns like "The commit message should be:", "Summary:", or just take first meaningful line
+                                        let processed = raw;
+                                        if (raw.length > 200) {
+                                            // Try to find explicit commit message in reasoning
+                                            const patterns = [
+                                                /(?:commit message|summary|subject)(?:\s+should be)?:\s*["\']?([^"\n]+)["\']?/i,
+                                                /^([A-Z][a-z]+\s+[a-z]+.*?)(?:\n|$)/m, // First sentence starting with capital
+                                            ];
+                                            for (const pattern of patterns) {
+                                                const match = raw.match(pattern);
+                                                if (match && match[1] && match[1].trim().length > 10 && match[1].trim().length < 100) {
+                                                    processed = match[1].trim();
+                                                    out.appendLine(`git-autopush: extracted from reasoning: ${processed}`);
+                                                    break;
+                                                }
+                                            }
+                                            // If no pattern match, take first non-meta sentence (skip "We are given", "The diff shows", etc.)
+                                            if (processed === raw) {
+                                                const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                                                for (const line of lines) {
+                                                    if (!/^(we are|the diff|the changes?|key changes|additionally|specifically)/i.test(line) 
+                                                        && line.length > 10 && line.length < 100) {
+                                                        processed = line;
+                                                        out.appendLine(`git-autopush: using first meaningful line: ${processed}`);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        resolve(processed);
                                     }
                                     catch (e) { 
                                         reject(new Error(`Failed to parse DeepSeek response: ${e.message} - Data: ${data.slice(0, 200)}`)); 
