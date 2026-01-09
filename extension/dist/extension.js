@@ -285,8 +285,8 @@ function activate(context) {
         // ═══════════════════════════════════════════════════════════════════════════
         
         try {
-            const aiEnabled = config.get('ai.enabled', false);
-            const generate = config.get('ai.generateCommitMessage', false);
+            const aiEnabled = config.get('ai.enabled', true);
+            const generate = config.get('ai.generateCommitMessage', true);
             const provider = config.get('ai.provider', 'deepseek');
             let deepseekKey = config.get('ai.apiKey', '') || config.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
             // Use Google Gemini 2.0 Flash - fast, accurate, and FREE

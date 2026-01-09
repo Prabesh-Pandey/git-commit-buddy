@@ -122,8 +122,8 @@
         },
         "gitAutopush.ai.enabled": {
           "type": "boolean",
-          "default": false,
-          "description": "Enable AI-generated commit messages (opt-in)."
+          "default": true,
+          "description": "Enable AI-generated commit messages."
         },
         "gitAutopush.ai.provider": {
           "type": "string",
@@ -151,7 +151,7 @@
         },
         "gitAutopush.ai.generateCommitMessage": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Generate commit messages via AI (requires API key)."
         },
         "gitAutopush.ai.reviewBeforeCommit": {
