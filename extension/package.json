@@ -146,8 +146,8 @@
         },
         "gitAutopush.ai.deepseekModel": {
           "type": "string",
-          "default": "google/gemini-2.0-flash-exp:free",
-          "description": "AI model to use. Recommended: google/gemini-2.0-flash-exp:free (free & fast) or deepseek/deepseek-chat (accurate)"
+          "default": "deepseek/deepseek-chat",
+          "description": "AI model to use. deepseek/deepseek-chat (reliable) or google/gemini-2.0-flash-exp:free (free but rate limited)"
         },
         "gitAutopush.ai.generateCommitMessage": {
           "type": "boolean",

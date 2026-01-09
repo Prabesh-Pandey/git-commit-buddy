@@ -19,7 +19,7 @@ function activate(context) {
     const triggerNonces = new Map();
     
     // ═══════════════════════════════════════════════════════════════════════════════
-    // 📊 COMMIT STATISTICS & GAMIFICATION
+    // 📊 COMMIT STATISTICS and GAMIFICATION
     // ═══════════════════════════════════════════════════════════════════════════════
     
     function getStats() {
