@@ -39,7 +39,7 @@ function createAIService(outputChannel) {
 FORMAT:
 - Line 1: ${emojiNote} Brief summary (max 50 chars, imperative mood: Add, Fix, Update, Remove)
 - Line 2: Empty line  
-- Lines 3-5: Optional details if the change is significant (what/why/impact)
+- Lines 3-5 or more: Optional details if the change is significant (what/why/impact)
 
 STYLE GUIDELINES:
 - Be specific and concise about what changed
