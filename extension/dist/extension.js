@@ -289,8 +289,8 @@ function activate(context) {
             const generate = config.get('ai.generateCommitMessage', false);
             const provider = config.get('ai.provider', 'deepseek');
             let deepseekKey = config.get('ai.apiKey', '') || config.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
-            // Use deepseek-chat instead of R1 - R1 is for reasoning, not simple generation
-            const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-chat');
+            // Use Google Gemini 2.0 Flash - fast, accurate, and FREE
+            const deepseekModel = config.get('ai.deepseekModel', 'google/gemini-2.0-flash-exp:free');
             
             if (aiEnabled && generate && provider === 'deepseek') {
                 if (!deepseekKey) {
