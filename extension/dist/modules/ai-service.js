@@ -32,14 +32,27 @@ function createAIService(outputChannel) {
      * @returns {Promise<string>} Generated commit message
      */
     async function generateCommitMessage({ apiKey, model, diffText, fileName, useEmoji = true }) {
-        const emojiNote = useEmoji ? 'Start with a relevant emoji.' : '';
+        const emojiNote = useEmoji ? 'Start with a relevant emoji that matches the change type.' : '';
         
-        const systemPrompt = `You write git commit messages. Rules:
-1. Max 50 characters
-2. Imperative mood (Add, Fix, Update, Remove)
-3. No period at end
-4. ${emojiNote}
-5. Be specific about what changed
+        const systemPrompt = `You are a creative git commit message writer. Write engaging, informative commit messages.
+
+FORMAT:
+- Line 1: ${emojiNote} Brief summary (max 50 chars, imperative mood: Add, Fix, Update, Remove)
+- Line 2: Empty line
+- Lines 3-5: Optional details if the change is significant (what/why/impact)
+
+STYLE GUIDELINES:
+- Be specific about what changed
+- Use active voice and present tense
+- No periods at end of subject line
+- Add context when helpful (e.g., "for better performance", "to fix bug #123")
+- For small changes: just the subject line is fine
+- For bigger changes: add 1-3 bullet points explaining why or what
+
+EMOJI GUIDE:
+✨ New feature | 🐛 Bug fix | 🔧 Config/tooling | 📝 Docs | 🎨 Style/UI
+♻️ Refactor | ⚡ Performance | 🔒 Security | 🧪 Tests | 🚀 Deploy
+💄 Cosmetic | 🔥 Remove code | 📦 Dependencies | 🏗️ Architecture
 
 Reply with ONLY the commit message, nothing else.`;
 
@@ -53,8 +66,8 @@ Reply with ONLY the commit message, nothing else.`;
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
             ],
-            temperature: 0.3,
-            max_tokens: 200
+            temperature: 0.5,
+            max_tokens: 300
         });
 
         out.appendLine(`git-autopush: AI request to ${model}...`);
@@ -132,18 +145,28 @@ Reply with ONLY the commit message, nothing else.`;
             throw new Error('Empty response from API');
         }
 
-        // Clean up the response
-        let processed = raw
-            .split('\n')[0]                          // Take first line only
-            .replace(/^["'`]+|["'`]+$/g, '')         // Remove quotes
-            .replace(/^\*+|\*+$/g, '')               // Remove asterisks
-            .replace(/^#+\s*/, '')                   // Remove markdown headers
-            .trim();
+        // Clean up the response - allow multi-line messages
+        let lines = raw
+            .split('\n')
+            .map(line => line
+                .replace(/^["'`]+|["'`]+$/g, '')     // Remove quotes
+                .replace(/^\*+|\*+$/g, '')           // Remove asterisks  
+                .replace(/^#+\s*/, '')               // Remove markdown headers
+                .trim()
+            )
+            .filter(line => line.length > 0);        // Remove empty lines
 
-        // Truncate if too long
-        if (processed.length > 72) {
-            processed = processed.slice(0, 69) + '...';
+        // Subject line (first line) - max 72 chars
+        let subject = lines[0] || '';
+        if (subject.length > 72) {
+            subject = subject.slice(0, 69) + '...';
         }
+
+        // Body lines (rest) - keep up to 4 more lines for details
+        const body = lines.slice(1, 5).join('\n');
+
+        // Combine: subject + blank line + body (if body exists)
+        const processed = body ? `${subject}\n\n${body}` : subject;
 
         return processed;
     }
