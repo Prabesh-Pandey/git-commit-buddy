@@ -32,12 +32,20 @@ function createAIService(outputChannel) {
      * @returns {Promise<string>} Generated commit message
      */
     async function generateCommitMessage({ apiKey, model, diffText, fileName, useEmoji = true }) {
-        const emojiNote = useEmoji ? 'Start with a relevant emoji that matches the change type.' : '';
+        const emojiInstruction = useEmoji 
+            ? 'Start with a relevant emoji that matches the change type.'
+            : 'Do NOT include any emojis. Start directly with the verb.';
         
+        const emojiGuide = useEmoji 
+            ? `\nEMOJI GUIDE (use sparingly, professional style):
+feat: ✨  fix: 🐛  refactor: ♻️  docs: 📝  style: 🎨
+perf: ⚡  test: 🧪  build: 📦  ci: 👷  chore: 🔧`
+            : '';
+
         const systemPrompt = `You are a professional git commit message writer. Write clear, informative commit messages.
 
 FORMAT:
-- Line 1: ${emojiNote} Brief summary (max 50 chars, imperative mood: Add, Fix, Update, Remove)
+- Line 1: ${emojiInstruction} Brief summary (max 50 chars, imperative mood: Add, Fix, Update, Remove)
 - Line 2: Empty line  
 - Lines 3-5 or more: Optional details if the change is significant (what/why/impact)
 
@@ -48,11 +56,7 @@ STYLE GUIDELINES:
 - Add context when helpful (e.g., "for better performance")
 - For small changes: just the subject line
 - For bigger changes: add 1-3 bullet points
-
-EMOJI GUIDE (use sparingly, professional style):
-feat: ✨  fix: 🐛  refactor: ♻️  docs: 📝  style: 🎨
-perf: ⚡  test: 🧪  build: 📦  ci: 👷  chore: 🔧
-
+${emojiGuide}
 Reply with ONLY the commit message, nothing else.`;
 
         const userPrompt = diffText 
