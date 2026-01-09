@@ -4,89 +4,225 @@ exports.deactivate = exports.activate = void 0;
 const vscode = require("vscode");
 const path = require("path");
 const minimatch = require("minimatch");
+
 function activate(context) {
-    // Note: read configuration inside the save handler so changes take effect immediately
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 🚀 GIT AUTOPUSH ON SAVE - ENHANCED EDITION
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
     const terminal = vscode.window.createTerminal('git-autopush');
     const out = vscode.window.createOutputChannel('git-autopush-debug');
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBar.command = 'git-autopush.runOnce';
-    // In-memory nonces for trigger tokens; stored here so external processes can't set them.
+    statusBar.command = 'git-autopush.showQuickActions';
+    
+    // In-memory state
     const triggerNonces = new Map();
-
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 📊 COMMIT STATISTICS & GAMIFICATION
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    function getStats() {
+        return context.globalState.get('gitAutopush.stats', {
+            totalCommits: 0,
+            todayCommits: 0,
+            lastCommitDate: null,
+            streak: 0,
+            longestStreak: 0,
+            commitHistory: [],
+            achievements: []
+        });
+    }
+    
+    function saveStats(stats) {
+        context.globalState.update('gitAutopush.stats', stats);
+    }
+    
+    function updateStats(commitMessage) {
+        const stats = getStats();
+        const today = new Date().toDateString();
+        const lastDate = stats.lastCommitDate ? new Date(stats.lastCommitDate).toDateString() : null;
+        
+        stats.totalCommits++;
+        
+        if (lastDate === today) {
+            stats.todayCommits++;
+        } else {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (lastDate === yesterday.toDateString()) {
+                stats.streak++;
+            } else if (lastDate !== today) {
+                stats.streak = 1;
+            }
+            stats.todayCommits = 1;
+        }
+        
+        if (stats.streak > stats.longestStreak) {
+            stats.longestStreak = stats.streak;
+        }
+        
+        stats.lastCommitDate = new Date().toISOString();
+        
+        stats.commitHistory.unshift({
+            message: commitMessage.slice(0, 100),
+            timestamp: new Date().toISOString()
+        });
+        if (stats.commitHistory.length > 50) {
+            stats.commitHistory.pop();
+        }
+        
+        checkAchievements(stats);
+        saveStats(stats);
+        return stats;
+    }
+    
+    function checkAchievements(stats) {
+        const achievements = [
+            { id: 'first_commit', name: '🎉 First Commit!', condition: () => stats.totalCommits >= 1 },
+            { id: 'ten_commits', name: '🔟 Ten Commits!', condition: () => stats.totalCommits >= 10 },
+            { id: 'fifty_commits', name: '🎯 50 Commits!', condition: () => stats.totalCommits >= 50 },
+            { id: 'hundred_commits', name: '💯 100 Commits!', condition: () => stats.totalCommits >= 100 },
+            { id: 'streak_3', name: '🔥 3 Day Streak!', condition: () => stats.streak >= 3 },
+            { id: 'streak_7', name: '🌟 Week Warrior!', condition: () => stats.streak >= 7 },
+            { id: 'streak_30', name: '👑 Monthly Master!', condition: () => stats.streak >= 30 },
+            { id: 'productive_day', name: '⚡ Super Productive!', condition: () => stats.todayCommits >= 10 },
+        ];
+        
+        for (const ach of achievements) {
+            if (!stats.achievements.includes(ach.id) && ach.condition()) {
+                stats.achievements.push(ach.id);
+                vscode.window.showInformationMessage(`🏆 Achievement Unlocked: ${ach.name}`);
+            }
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 🎨 ENHANCED STATUS BAR
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
     function updateStatusBar() {
         try {
             const cfg = vscode.workspace.getConfiguration('gitAutopush');
             const autoCommit = cfg.get('autoCommit', false);
             const autoPush = cfg.get('autoPush', false);
             const dryRun = cfg.get('dryRun', true);
-            let text = 'GitAuto:';
-            text += autoCommit ? ' Commit-On' : ' Commit-Off';
-            text += autoPush ? ' Push-On' : ' Push-Off';
-            if (dryRun) {
-                text += ' (dry)';
+            const showStats = cfg.get('showStatsInStatusBar', true);
+            const stats = getStats();
+            
+            let icon = autoCommit ? '$(git-commit)' : '$(circle-slash)';
+            let text = icon;
+            
+            if (autoCommit) {
+                text += autoPush ? ' Auto' : ' Commit';
+                if (dryRun) text += ' (dry)';
+            } else {
+                text += ' Off';
             }
+            
+            if (showStats && stats.streak > 0) {
+                text += ` 🔥${stats.streak}`;
+            }
+            
             statusBar.text = text;
-            const last = context.workspaceState.get('gitAutopush.lastAction', null);
-            statusBar.tooltip = last ? `Last action: ${last}` : 'No actions yet';
+            
+            const tooltipLines = [
+                `**Git AutoPush** $(git-commit)`,
+                `---`,
+                `Auto Commit: ${autoCommit ? '✅ On' : '❌ Off'}`,
+                `Auto Push: ${autoPush ? '✅ On' : '❌ Off'}`,
+                `Dry Run: ${dryRun ? '🧪 Yes' : '🚀 No'}`,
+                `---`,
+                `📊 **Stats**`,
+                `Total: ${stats.totalCommits} | Today: ${stats.todayCommits}`,
+                `Streak: ${stats.streak} 🔥 | Best: ${stats.longestStreak}`,
+                `---`,
+                `*Click for quick actions*`
+            ];
+            
+            statusBar.tooltip = new vscode.MarkdownString(tooltipLines.join('\n'));
+            statusBar.tooltip.isTrusted = true;
+            statusBar.backgroundColor = autoCommit && !dryRun 
+                ? new vscode.ThemeColor('statusBarItem.warningBackground') 
+                : undefined;
             statusBar.show();
         }
         catch (e) {
-            // ignore
+            out.appendLine(`git-autopush: statusBar error: ${e?.message || e}`);
         }
     }
     updateStatusBar();
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 💾 UNDO LAST COMMIT FEATURE  
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    let lastCommitInfo = null;
+    
+    function storeLastCommit(workspaceFolder, message) {
+        try {
+            const hash = require('child_process')
+                .execSync('git rev-parse HEAD', { cwd: workspaceFolder, stdio: ['ignore', 'pipe', 'ignore'] })
+                .toString().trim();
+            lastCommitInfo = { hash, message, workspace: workspaceFolder, timestamp: Date.now() };
+        } catch (e) {
+            lastCommitInfo = null;
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 🎯 MAIN SAVE HANDLER
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
-        // Only act on saves that were triggered via our save-and-run keybinding.
-        // We store an object { path, expires } when the keybinding runs to avoid
-        // reacting to external or assistant-made file changes. Token is ephemeral.
         const token = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
         if (!token || !token.path) {
-            out.appendLine(`git-autopush: no trigger token set — ignoring save: ${doc.uri.fsPath}`);
+            out.appendLine(`git-autopush: no trigger token — ignoring save: ${doc.uri.fsPath}`);
             return;
         }
-        // If token expired, clear and ignore
+        
         const now = Date.now();
         if (!token.expires || token.expires < now) {
-            out.appendLine(`git-autopush: trigger token expired for ${token.path} (now=${now}, expires=${token.expires})`);
+            out.appendLine(`git-autopush: token expired for ${token.path}`);
             context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
             return;
         }
+        
         if (token.path !== doc.uri.fsPath) {
-            out.appendLine(`git-autopush: trigger token path mismatch (token=${token.path}) — save for ${doc.uri.fsPath} ignored`);
+            out.appendLine(`git-autopush: token path mismatch — ignoring ${doc.uri.fsPath}`);
             return;
         }
-        out.appendLine(`git-autopush: valid trigger token matched for ${doc.uri.fsPath}`);
-        // Mark that this save was triggered by the guarded Save+Run keybinding
+        
+        out.appendLine(`git-autopush: valid token for ${doc.uri.fsPath}`);
         const triggeredBySaveKey = true;
-        // Validate in-memory nonce to ensure only our process set the token
+        
         try {
             const expectedNonce = token.nonce || null;
             const currentNonce = triggerNonces.get(doc.uri.fsPath) || null;
             if (!expectedNonce || !currentNonce || expectedNonce !== currentNonce) {
-                out.appendLine(`git-autopush: nonce mismatch or missing for ${doc.uri.fsPath} (expected=${expectedNonce}, current=${currentNonce})`);
+                out.appendLine(`git-autopush: nonce mismatch`);
                 return;
             }
-            // consume both workspace token and in-memory nonce
             context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
             triggerNonces.delete(doc.uri.fsPath);
         }
         catch (e) {
-            out.appendLine('git-autopush: nonce validation failed — ignoring save');
+            out.appendLine('git-autopush: nonce validation failed');
             return;
         }
+        
         var _a, _b;
-        // Read current configuration at save time so updates take effect immediately
         const config = vscode.workspace.getConfiguration('gitAutopush');
-        const scriptPathCfg = config.get('scriptPath', '${workspaceFolder}/git-autopush.sh');
         const globs = config.get('watchGlobs', ['**/*.{py,js,ts,md,json,txt}']);
         const dryRun = config.get('dryRun', true);
         const autoCommit = config.get('autoCommit', false);
         const autoPush = config.get('autoPush', false);
         const protectedBranches = config.get('protectedBranches', ['main', 'master', 'production']);
         const sensitivePatterns = config.get('sensitiveFileGlobs', ['.env', '*.key', 'credentials.json', '*.pem']);
+        const useEmoji = config.get('useEmoji', true);
         const workspaceFolder = ((_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath) || '';
         const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
-        // check globs
+        
         let matched = false;
         for (const g of globs) {
             if (minimatch(rel, g)) {
@@ -94,47 +230,40 @@ function activate(context) {
                 break;
             }
         }
-        if (!matched) {
-            return;
-        }
-
-        // If autoCommit is not enabled, skip.
+        if (!matched) return;
+        
         if (!autoCommit) {
-            out.appendLine('git-autopush: autoCommit disabled — skipping.');
+            out.appendLine('git-autopush: autoCommit disabled — skipping');
             return;
         }
-
-        // Basic safety checks: ensure inside git repo and file isn't ignored/sensitive
+        
         let repoRoot = '';
         try {
             repoRoot = require('child_process').execSync('git rev-parse --show-toplevel', { cwd: workspaceFolder, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
         }
         catch (e) {
-            out.appendLine('git-autopush: workspace is not a git repository — skipping.');
+            out.appendLine('git-autopush: not a git repository');
+            vscode.window.showWarningMessage('Git AutoPush: Not a git repository');
             return;
         }
-
-        // Don't act on ignored files
+        
         try {
             const check = require('child_process').spawnSync('git', ['check-ignore', doc.uri.fsPath], { cwd: repoRoot });
             if (check.status === 0) {
-                out.appendLine(`git-autopush: file is ignored by git (check-ignore) — skipping: ${rel}`);
+                out.appendLine(`git-autopush: file ignored by git — skipping`);
                 return;
             }
         }
-        catch (e) {
-            // ignore check errors
-        }
-
-        // Don't act on sensitive file patterns
+        catch (e) { }
+        
         for (const p of sensitivePatterns) {
             if (minimatch(rel, p)) {
-                out.appendLine(`git-autopush: file matches sensitive pattern '${p}' — skipping: ${rel}`);
+                out.appendLine(`git-autopush: sensitive file — skipping`);
+                vscode.window.showWarningMessage(`Git AutoPush: Skipping sensitive file`);
                 return;
             }
         }
-
-        // Branch safety: if autoPush enabled, avoid protected branches
+        
         let branch = '';
         try {
             branch = require('child_process').execSync('git symbolic-ref --short HEAD', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
@@ -142,550 +271,592 @@ function activate(context) {
         catch (e) {
             branch = require('child_process').execSync('git rev-parse --short HEAD', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
         }
+        
+        let canPush = autoPush;
         if (autoPush && protectedBranches.includes(branch)) {
-            out.appendLine(`git-autopush: autoPush disabled on protected branch '${branch}' — skipping push.`);
+            out.appendLine(`git-autopush: protected branch '${branch}' — no push`);
+            canPush = false;
         }
-        // Aggressively expand vars and normalize script path
-        let scriptPath = scriptPathCfg || '';
-        if (workspaceFolder) {
-            scriptPath = scriptPath.replace(/\$\{workspaceFolder(:[^}]+)?\}/g, workspaceFolder);
-            scriptPath = scriptPath.replace(/\$\{workspaceRoot(:[^}]+)?\}/g, workspaceFolder);
-        }
-        // Expand environment variables like $HOME
-        scriptPath = scriptPath.replace(/\$HOME/g, process.env.HOME || '');
-        // Expand ~ to home
-        if (scriptPath.startsWith('~')) {
-            scriptPath = path.join(process.env.HOME || '', scriptPath.slice(1));
-        }
-        // If still contains ${...} patterns, strip them
-        scriptPath = scriptPath.replace(/\$\{[^}]+\}/g, '');
-        // If relative, resolve against workspace
-        if (!path.isAbsolute(scriptPath) && workspaceFolder) {
-            scriptPath = path.resolve(workspaceFolder, scriptPath);
-        }
-        // Fallback behavior: if resolved path doesn't exist, try and use a global script.
-        if (!require('fs').existsSync(scriptPath)) {
-            // 1) Check environment variable GITAUTOPUSH_SCRIPT
-            const envPath = process.env.GITAUTOPUSH_SCRIPT || '';
-            if (envPath && require('fs').existsSync(envPath)) {
-                scriptPath = envPath;
-            }
-            else {
-                // 2) Check user's Per/Scripts common location
-                const homeFallback = path.join(process.env.HOME || '', 'Per', 'Scripts', 'git-autopush.sh');
-                if (require('fs').existsSync(homeFallback)) {
-                    scriptPath = homeFallback;
-                }
-                else {
-                    // 3) Fall back to workspace-local fallback as before
-                    const fallback = path.join(workspaceFolder || '', 'git-autopush.sh');
-                    if (require('fs').existsSync(fallback)) {
-                        scriptPath = fallback;
-                    }
-                }
-            }
-        }
-        const timestamp = new Date().toISOString();
-
-        // Default message fallback
+        
         let message = `Saved: ${path.basename(rel)}`;
-
-        // Attempt AI-generated commit message if configured and available.
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // 🤖 AI COMMIT MESSAGE GENERATION
+        // ═══════════════════════════════════════════════════════════════════════════
+        
         try {
             const aiEnabled = config.get('ai.enabled', false);
             const generate = config.get('ai.generateCommitMessage', false);
             const provider = config.get('ai.provider', 'deepseek');
-            // Key resolution priority: 1) machine-local config, 2) environment variable
-            // Note: We check both ai.apiKey and deprecated ai.deepseekApiKey for backward compatibility
             let deepseekKey = config.get('ai.apiKey', '') || config.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
             const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
-            const keySource = config.get('ai.apiKey', '') ? 'machine-config' : (config.get('ai.deepseekApiKey', '') ? 'deprecated-config' : (process.env.DEEPSEEK_API_KEY ? 'env-var' : 'none'));
-            if (keySource !== 'none') {
-                out.appendLine(`git-autopush: using API key from ${keySource}`);
-            }
-
+            
             if (aiEnabled && generate && provider === 'deepseek') {
                 if (!deepseekKey) {
-                    // Ask user for key and store machine-local
                     try {
                         const entered = await vscode.window.showInputBox({ 
-                            prompt: 'DeepSeek API key not found. Enter your OpenRouter API key (starts with sk-or-...)', 
+                            prompt: 'Enter your OpenRouter API key', 
                             placeHolder: 'sk-or-v1-...', 
                             ignoreFocusOut: true, 
                             password: true,
                             validateInput: (value) => {
-                                if (!value || value.trim().length < 10) return 'API key seems too short';
-                                if (!value.startsWith('sk-')) return 'OpenRouter keys typically start with sk-';
+                                if (!value || value.trim().length < 10) return 'API key too short';
+                                if (!value.startsWith('sk-')) return 'Should start with sk-';
                                 return null;
                             }
                         });
                         if (typeof entered === 'string' && entered.trim()) {
                             await config.update('ai.apiKey', entered.trim(), vscode.ConfigurationTarget.Machine);
                             deepseekKey = entered.trim();
-                            out.appendLine('git-autopush: API key saved to machine-local config (gitAutopush.ai.apiKey)');
-                        }
-                        else {
-                            out.appendLine('git-autopush: no API key provided — falling back to default message');
                         }
                     }
                     catch (err) {
-                        out.appendLine('git-autopush: failed to save API key: ' + (err?.message || String(err)));
+                        out.appendLine('git-autopush: API key save failed');
                     }
                 }
-
+                
                 if (deepseekKey) {
-                    out.appendLine('git-autopush: attempting DeepSeek generation for commit message...');
-                    try {
-                        const https = require('https');
-                        const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. 
-CRITICAL: Your final answer MUST be ONLY a short commit message (max 50 chars for subject line).
-Format: 
-- First line: short subject (imperative mood, no period)
-- Optional: blank line then brief body (max 72 chars per line)
-Do NOT include quotes, explanations, or analysis. Just the commit message itself.`;
-                        // For Save+Run we want the exact same behavior as the helper script:
-                        // 1) stage all changes, 2) send the staged diff (git diff --cached) to DeepSeek.
-                        // Fallback to a file diff or excerpt if staging/diffing fails.
-                        let diffText = '';
+                    out.appendLine('git-autopush: generating AI message...');
+                    
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: "🤖 Generating commit message...",
+                        cancellable: false
+                    }, async () => {
                         try {
+                            const https = require('https');
+                            const emojiNote = useEmoji ? 'Use a relevant emoji at start.' : 'No emojis.';
+                            const systemPrompt = `You are a commit message expert. Write ONE concise conventional commit message.
+RULES:
+- Subject: max 50 chars, imperative mood (Add, Fix, Update), no period
+- ${emojiNote}
+- Output ONLY the commit message. No quotes, no explanation, no markdown.`;
+                            
+                            let diffText = '';
                             try {
                                 require('child_process').execSync('git add -A', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] });
+                                diffText = require('child_process').execSync('git diff --cached --no-color --unified=3', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
                             }
                             catch (e) {
-                                // ignore staging errors
+                                try {
+                                    diffText = require('child_process').execSync(`git diff --no-color -- "${rel}"`, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+                                }
+                                catch (e2) {
+                                    diffText = doc.getText().slice(0, 2000);
+                                }
                             }
-                            diffText = require('child_process').execSync('git diff --cached --no-color --unified=3', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
-                        }
-                        catch (e) {
-                            try {
-                                diffText = require('child_process').execSync(`git diff --no-color --unified=3 -- ${rel}`, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
-                            }
-                            catch (e2) {
-                                diffText = doc.getText().slice(0, 2000);
-                            }
-                        }
-                        // Truncate to avoid huge payloads
-                        if (diffText.length > 8000) diffText = diffText.slice(0, 8000) + '\n... (truncated)';
-                        const userPrompt = `Generate a commit message for the following changes (prefer diff):\n\nFile: ${rel}\n\nDiff / Excerpt:\n${diffText}`;
-                        const payload = JSON.stringify({ 
-                            model: deepseekModel, 
-                            messages: [
-                                { role: 'system', content: systemPrompt }, 
-                                { role: 'user', content: userPrompt }
-                            ],
-                            temperature: 0.3,
-                            max_tokens: 200
-                        });
-                        const urlOpts = { 
-                            hostname: 'openrouter.ai', 
-                            port: 443, 
-                            path: '/api/v1/chat/completions', 
-                            method: 'POST', 
-                            headers: { 
-                                'Content-Type': 'application/json', 
-                                'Content-Length': Buffer.byteLength(payload), 
-                                'Authorization': `Bearer ${deepseekKey}`,
-                                'HTTP-Referer': 'https://github.com/local/git-autopush-on-save',
-                                'X-Title': 'Git AutoPush Extension'
-                            } 
-                        };
-
-                        const suggestedRaw = await new Promise((resolve, reject) => {
-                            const req = https.request(urlOpts, (res) => {
-                                let data = '';
-                                res.on('data', (c) => data += c);
-                                res.on('end', () => {
-                                    try {
-                                        // Check HTTP status code first
-                                        if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
-                                            return reject(new Error(`DeepSeek API error: HTTP ${res.statusCode} - ${data.slice(0, 200)}`));
-                                        }
-                                        const json = JSON.parse(data || '{}');
-                                        // Log full response for debugging
-                                        out.appendLine(`git-autopush: DeepSeek raw response: ${JSON.stringify(json).slice(0, 500)}`);
-                                        // Check for API error responses
-                                        if (json.error) {
-                                            return reject(new Error(`DeepSeek API error: ${json.error.message || JSON.stringify(json.error)}`));
-                                        }
-                                        // Priority order for OpenRouter/DeepSeek response formats
-                                        const candidates = [];
-                                        // 1. DeepSeek R1 reasoning field (highest priority for R1 models)
-                                        if (json.choices && Array.isArray(json.choices) && json.choices.length > 0) {
-                                            try { 
-                                                const reasoning = json.choices[0].message?.reasoning;
-                                                if (reasoning && typeof reasoning === 'string') candidates.push(reasoning);
-                                            } catch (e) { }
-                                        }
-                                        // 2. Standard OpenAI/OpenRouter content format
-                                        if (json.choices && Array.isArray(json.choices) && json.choices.length > 0) {
-                                            try { 
-                                                const content = json.choices[0].message?.content || json.choices[0].text;
-                                                if (content && typeof content === 'string') candidates.push(content); 
-                                            } catch (e) { }
-                                        }
-                                        // 3. Alternative output formats
-                                        if (json.output && Array.isArray(json.output)) {
-                                            try { candidates.push(json.output[0].content); } catch (e) { }
-                                        }
-                                        // 4. Direct message fields
-                                        try { if (json.commit_message) candidates.push(json.commit_message); } catch (e) { }
-                                        try { if (json.message) candidates.push(json.message); } catch (e) { }
-                                        try { if (json.result) candidates.push(json.result); } catch (e) { }
-                                        const raw = candidates.find(c => typeof c === 'string' && c.trim().length > 0);
-                                        out.appendLine(`git-autopush: DeepSeek extracted content: ${raw ? raw.slice(0, 200) : 'NONE'}`);
-                                        if (!raw) {
-                                            return reject(new Error(`DeepSeek response missing content: ${JSON.stringify(json).slice(0, 200)}`));
-                                        }
-                                        // For DeepSeek R1 reasoning field: extract concise commit message from verbose reasoning
-                                        // Look for patterns like "The commit message should be:", "Summary:", or just take first meaningful line
-                                        let processed = raw;
-                                        if (raw.length > 200) {
-                                            // Try to find explicit commit message in reasoning
-                                            const patterns = [
-                                                /(?:commit message|summary|subject)(?:\s+should be)?:\s*["\']?([^"\n]+)["\']?/i,
-                                                /^([A-Z][a-z]+\s+[a-z]+.*?)(?:\n|$)/m, // First sentence starting with capital
-                                            ];
-                                            for (const pattern of patterns) {
-                                                const match = raw.match(pattern);
-                                                if (match && match[1] && match[1].trim().length > 10 && match[1].trim().length < 100) {
-                                                    processed = match[1].trim();
-                                                    out.appendLine(`git-autopush: extracted from reasoning: ${processed}`);
-                                                    break;
-                                                }
+                            
+                            if (diffText.length > 8000) diffText = diffText.slice(0, 8000) + '\n...(truncated)';
+                            
+                            const ext = path.extname(rel).toLowerCase();
+                            const fileType = { '.js': 'JavaScript', '.ts': 'TypeScript', '.py': 'Python', '.md': 'Markdown', '.json': 'JSON' }[ext] || 'code';
+                            
+                            const userPrompt = `Generate commit message for ${fileType} changes:\n\nFile: ${rel}\n\nDiff:\n${diffText}`;
+                            
+                            const payload = JSON.stringify({ 
+                                model: deepseekModel, 
+                                messages: [
+                                    { role: 'system', content: systemPrompt }, 
+                                    { role: 'user', content: userPrompt }
+                                ],
+                                temperature: 0.3,
+                                max_tokens: 200
+                            });
+                            
+                            const suggestedRaw = await new Promise((resolve, reject) => {
+                                const req = https.request({ 
+                                    hostname: 'openrouter.ai', 
+                                    port: 443, 
+                                    path: '/api/v1/chat/completions', 
+                                    method: 'POST', 
+                                    headers: { 
+                                        'Content-Type': 'application/json', 
+                                        'Content-Length': Buffer.byteLength(payload), 
+                                        'Authorization': `Bearer ${deepseekKey}`,
+                                        'HTTP-Referer': 'https://github.com/local/git-autopush-on-save',
+                                        'X-Title': 'Git AutoPush Extension'
+                                    } 
+                                }, (res) => {
+                                    let data = '';
+                                    res.on('data', (c) => data += c);
+                                    res.on('end', () => {
+                                        try {
+                                            if (res.statusCode < 200 || res.statusCode >= 300) {
+                                                return reject(new Error(`HTTP ${res.statusCode}`));
                                             }
-                                            // If no pattern match, take first non-meta sentence (skip "We are given", "The diff shows", etc.)
-                                            if (processed === raw) {
-                                                const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                                                for (const line of lines) {
-                                                    if (!/^(we are|the diff|the changes?|key changes|additionally|specifically)/i.test(line) 
-                                                        && line.length > 10 && line.length < 100) {
-                                                        processed = line;
-                                                        out.appendLine(`git-autopush: using first meaningful line: ${processed}`);
+                                            const json = JSON.parse(data || '{}');
+                                            out.appendLine(`git-autopush: API response: ${JSON.stringify(json).slice(0, 500)}`);
+                                            
+                                            if (json.error) {
+                                                return reject(new Error(json.error.message || 'API error'));
+                                            }
+                                            
+                                            const candidates = [];
+                                            if (json.choices && json.choices[0]) {
+                                                const msg = json.choices[0].message;
+                                                // PRIORITY 1: content field (final answer for most models)
+                                                if (msg?.content && msg.content.trim()) candidates.push(msg.content.trim());
+                                                // PRIORITY 2: reasoning field (DeepSeek R1 thinking) - needs extraction
+                                                // Note: We only use reasoning if content is empty
+                                            }
+                                            
+                                            let raw = candidates.find(c => c && c.length > 0);
+                                            
+                                            // If content was empty, try to extract from reasoning
+                                            if (!raw && json.choices && json.choices[0]?.message?.reasoning) {
+                                                const reasoning = json.choices[0].message.reasoning;
+                                                out.appendLine(`git-autopush: extracting from reasoning (${reasoning.length} chars)`);
+                                                
+                                                // Look for the actual commit message in reasoning
+                                                // DeepSeek R1 often concludes with the final answer
+                                                const extractPatterns = [
+                                                    /(?:final commit message|the commit message|my answer|output)[:\s]*["'`]([^"'`\n]{10,80})["'`]/i,
+                                                    /(?:final commit message|the commit message)[:\s]*\n*([A-Z][^\n]{10,80})/i,
+                                                    /```\n?([^\n`]{10,80})\n?```/,
+                                                    /["']([A-Z][a-z]+(?:\([^)]+\))?[:\s][^\n"']{10,60})["']/,
+                                                ];
+                                                
+                                                for (const pattern of extractPatterns) {
+                                                    const match = reasoning.match(pattern);
+                                                    if (match && match[1]) {
+                                                        raw = match[1].trim();
+                                                        out.appendLine(`git-autopush: found in reasoning: ${raw}`);
                                                         break;
                                                     }
                                                 }
+                                                
+                                                // Last resort: find conventional commit format line
+                                                if (!raw) {
+                                                    const lines = reasoning.split('\n');
+                                                    for (let i = lines.length - 1; i >= 0; i--) {
+                                                        const line = lines[i].trim();
+                                                        // Match conventional commit format: type: message or type(scope): message
+                                                        if (/^(feat|fix|docs|style|refactor|test|chore|perf|build|ci)(\([^)]+\))?:\s+\S/i.test(line)) {
+                                                            raw = line;
+                                                            out.appendLine(`git-autopush: found conventional commit: ${raw}`);
+                                                            break;
+                                                        }
+                                                        // Match emoji + verb format
+                                                        if (/^[🎉✨🐛📚💄♻️🧪🔧⚡]\s*[A-Z][a-z]+/.test(line) && line.length >= 15 && line.length <= 80) {
+                                                            raw = line;
+                                                            out.appendLine(`git-autopush: found emoji commit: ${raw}`);
+                                                            break;
+                                                        }
+                                                    }
+                                                }
                                             }
+                                            
+                                            if (!raw) return reject(new Error('Empty response'));
+                                            
+                                            // Clean up the message - remove prompt echoes
+                                            let processed = raw
+                                                .replace(/^generate commit message.*?:/i, '')
+                                                .replace(/^["'`]+|["'`]+$/g, '')
+                                                .replace(/^\s*commit message[:\s]*/i, '')
+                                                .trim();
+                                            resolve(processed);
                                         }
-                                        resolve(processed);
-                                    }
-                                    catch (e) { 
-                                        reject(new Error(`Failed to parse DeepSeek response: ${e.message} - Data: ${data.slice(0, 200)}`)); 
-                                    }
+                                        catch (e) { 
+                                            reject(new Error(`Parse error: ${e.message}`)); 
+                                        }
+                                    });
                                 });
+                                req.on('error', (e) => reject(e));
+                                req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+                                req.setTimeout(15000);
+                                req.write(payload);
+                                req.end();
                             });
-                            req.on('error', (e) => reject(new Error(`DeepSeek HTTP request failed: ${e.message}`)));
-                            req.on('timeout', () => { 
-                                req.destroy(); 
-                                reject(new Error('DeepSeek request timeout (15s)')); 
-                            });
-                            req.setTimeout(15000);
-                            req.write(payload);
-                            req.end();
-                        });
-
-                        const rawText = (suggestedRaw || '').toString().trim();
-                        // If this save was triggered by the guarded Save+Run flow, auto-apply the full AI reply
-                        // to match the helper script behavior. Otherwise respect the configured review setting.
-                        let reviewBefore = config.get('ai.reviewBeforeCommit', true);
-                        if (typeof triggeredBySaveKey !== 'undefined' && triggeredBySaveKey) {
-                            reviewBefore = false;
-                        }
-                        if (!reviewBefore) {
-                            // Auto-apply the full DeepSeek reply as the commit message
-                            message = rawText || `Saved: ${path.basename(rel)}`;
-                            out.appendLine(`git-autopush: DeepSeek-generated message auto-applied (subject: ${message.split(/\n/)[0]})`);
-                        }
-                        else {
-                            const subject = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean)[0] || `Saved: ${path.basename(rel)}`;
-                            const edited = await vscode.window.showInputBox({ prompt: 'Confirm commit subject', value: subject, placeHolder: 'Enter commit subject', ignoreFocusOut: true });
-                            if (typeof edited === 'undefined') {
-                                out.appendLine('git-autopush: commit aborted by user (prompt cancelled)');
-                                // user cancelled; abort AI flow (message remains fallback)
+                            
+                            const rawText = (suggestedRaw || '').toString().trim();
+                            let reviewBefore = config.get('ai.reviewBeforeCommit', true);
+                            if (triggeredBySaveKey) reviewBefore = false;
+                            
+                            if (!reviewBefore) {
+                                message = rawText || `Saved: ${path.basename(rel)}`;
+                                out.appendLine(`git-autopush: using: ${message.split(/\n/)[0]}`);
                             }
                             else {
-                                message = edited.trim();
-                                const parts = rawText.split(/\n\n|\n/).map(s => s.trim()).filter(Boolean);
-                                if (parts.length > 1) {
-                                    const body = parts.slice(1).join('\n\n');
-                                    if (body) message += '\n\n' + body;
+                                const subject = rawText.split(/\n/)[0] || `Saved: ${path.basename(rel)}`;
+                                const edited = await vscode.window.showInputBox({ 
+                                    prompt: 'Confirm commit message', 
+                                    value: subject, 
+                                    ignoreFocusOut: true 
+                                });
+                                if (typeof edited === 'undefined') {
+                                    out.appendLine('git-autopush: cancelled');
+                                    return;
                                 }
-                                out.appendLine(`git-autopush: DeepSeek-generated message used (subject: ${message.split(/\n/)[0]})`);
+                                message = edited.trim() || subject;
                             }
                         }
-                    }
-                    catch (err) {
-                        out.appendLine(`git-autopush: DeepSeek generation failed: ${err?.message || String(err)}`);
-                        out.appendLine('git-autopush: falling back to default message');
-                    }
+                        catch (err) {
+                            out.appendLine(`git-autopush: AI failed: ${err?.message || err}`);
+                        }
+                    });
                 }
             }
         }
         catch (e) {
-            out.appendLine(`git-autopush: DeepSeek outer failure: ${e?.message || String(e)}`);
-            out.appendLine('git-autopush: falling back to default message');
+            out.appendLine(`git-autopush: AI error: ${e?.message || e}`);
         }
-        // Build git commands directly so we don't require a project-level git-autopush.sh
-        const commitMsgEsc = message.replace(/"/g, '\\"');
-        const gitCmds = [];
-        gitCmds.push('git add -A');
-        gitCmds.push(`git commit -m "${commitMsgEsc}" || echo \"git-autopush: nothing to commit\"`);
-        if (!dryRun && autoPush) {
-            const remote = 'origin';
-            try {
-                // ensure branch is set (from earlier branch resolution)
-            }
-            catch (e) { }
-            gitCmds.push(`git push ${remote} ${branch}`);
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // 🚀 EXECUTE GIT COMMANDS
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        const commitMsgEsc = message.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+        const gitCmds = ['git add -A', `git commit -m "${commitMsgEsc}" || echo "nothing to commit"`];
+        
+        if (!dryRun && canPush) {
+            gitCmds.push(`git push origin ${branch}`);
         }
+        
         const cwdPrefix = workspaceFolder ? `cd "${workspaceFolder.replace(/"/g, '\\"')}" && ` : '';
         const fullCmd = cwdPrefix + gitCmds.join(' && ');
-        out.appendLine(`git-autopush: running git -> ${fullCmd}`);
-        out.show(true);
+        
+        out.appendLine(`git-autopush: ${fullCmd}`);
         terminal.show(true);
+        
         if (!dryRun) {
             terminal.sendText(fullCmd, true);
+            const stats = updateStats(message);
+            storeLastCommit(workspaceFolder, message);
+            
+            const action = canPush ? 'Committed & pushed' : 'Committed';
+            vscode.window.showInformationMessage(
+                `$(git-commit) ${action}! (${stats.todayCommits} today, 🔥${stats.streak})`,
+                'View Log'
+            ).then(sel => { if (sel === 'View Log') out.show(); });
         }
         else {
-            out.appendLine('git-autopush: dryRun enabled — not executing git commands');
+            out.appendLine('git-autopush: dry run — not executing');
+            out.show(true);
         }
+        
+        updateStatusBar();
+        context.workspaceState.update('gitAutopush.lastAction', new Date().toISOString());
     });
     context.subscriptions.push(onSave);
-
-    // Commands
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 📋 QUICK ACTIONS MENU
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    const quickActionsCmd = vscode.commands.registerCommand('git-autopush.showQuickActions', async () => {
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const autoCommit = cfg.get('autoCommit', false);
+        const autoPush = cfg.get('autoPush', false);
+        const dryRun = cfg.get('dryRun', true);
+        const stats = getStats();
+        
+        const items = [
+            { label: `$(git-commit) Auto Commit: ${autoCommit ? 'ON ✅' : 'OFF'}`, description: 'Toggle auto commits', action: 'toggleCommit' },
+            { label: `$(cloud-upload) Auto Push: ${autoPush ? 'ON ✅' : 'OFF'}`, description: 'Toggle auto push', action: 'togglePush' },
+            { label: `$(beaker) Dry Run: ${dryRun ? 'ON 🧪' : 'OFF'}`, description: 'Toggle dry run mode', action: 'toggleDry' },
+            { label: '', kind: vscode.QuickPickItemKind.Separator },
+            { label: '$(play) Run Once Now', description: 'Commit now', action: 'runOnce' },
+            { label: '$(discard) Undo Last Commit', description: lastCommitInfo ? `Undo: ${lastCommitInfo.message.slice(0,30)}...` : 'No commit to undo', action: 'undo' },
+            { label: '', kind: vscode.QuickPickItemKind.Separator },
+            { label: '$(graph) View Stats', description: `${stats.totalCommits} commits, ${stats.streak} day streak`, action: 'stats' },
+            { label: '$(history) Commit History', description: 'Recent commits', action: 'history' },
+            { label: '$(key) Set API Key', description: 'Configure AI key', action: 'apiKey' },
+            { label: '$(output) View Debug Log', description: 'Open debug output', action: 'log' },
+        ];
+        
+        const selected = await vscode.window.showQuickPick(items, { placeHolder: '🚀 Git AutoPush - Quick Actions' });
+        if (!selected) return;
+        
+        switch (selected.action) {
+            case 'toggleCommit':
+                await cfg.update('autoCommit', !autoCommit, vscode.ConfigurationTarget.Workspace);
+                vscode.window.showInformationMessage(`Auto Commit: ${!autoCommit ? 'ON' : 'OFF'}`);
+                break;
+            case 'togglePush':
+                await cfg.update('autoPush', !autoPush, vscode.ConfigurationTarget.Workspace);
+                vscode.window.showInformationMessage(`Auto Push: ${!autoPush ? 'ON' : 'OFF'}`);
+                break;
+            case 'toggleDry':
+                await cfg.update('dryRun', !dryRun, vscode.ConfigurationTarget.Workspace);
+                vscode.window.showInformationMessage(`Dry Run: ${!dryRun ? 'ON' : 'OFF'}`);
+                break;
+            case 'runOnce': vscode.commands.executeCommand('git-autopush.runOnce'); break;
+            case 'undo': vscode.commands.executeCommand('git-autopush.undoLastCommit'); break;
+            case 'stats': vscode.commands.executeCommand('git-autopush.showStats'); break;
+            case 'history': vscode.commands.executeCommand('git-autopush.showHistory'); break;
+            case 'apiKey': vscode.commands.executeCommand('git-autopush.setApiKey'); break;
+            case 'log': out.show(); break;
+        }
+        updateStatusBar();
+    });
+    context.subscriptions.push(quickActionsCmd);
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 📊 SHOW STATS COMMAND
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    const showStatsCmd = vscode.commands.registerCommand('git-autopush.showStats', async () => {
+        const stats = getStats();
+        const allAch = [
+            { id: 'first_commit', name: '🎉 First Commit' },
+            { id: 'ten_commits', name: '🔟 10 Commits' },
+            { id: 'fifty_commits', name: '🎯 50 Commits' },
+            { id: 'hundred_commits', name: '💯 100 Commits' },
+            { id: 'streak_3', name: '🔥 3 Day Streak' },
+            { id: 'streak_7', name: '🌟 Week Warrior' },
+            { id: 'streak_30', name: '👑 Monthly Master' },
+            { id: 'productive_day', name: '⚡ Super Productive' },
+        ];
+        
+        const earned = allAch.filter(a => stats.achievements.includes(a.id)).map(a => a.name);
+        const locked = allAch.filter(a => !stats.achievements.includes(a.id)).map(a => `🔒 ${a.name}`);
+        
+        const panel = vscode.window.createWebviewPanel('gitAutopushStats', '📊 Git AutoPush Stats', vscode.ViewColumn.One, {});
+        
+        panel.webview.html = `<!DOCTYPE html>
+<html><head><style>
+body { font-family: var(--vscode-font-family); padding: 20px; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+.stat { font-size: 48px; text-align: center; margin: 20px 0; }
+.label { font-size: 14px; color: var(--vscode-descriptionForeground); text-align: center; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 30px 0; }
+.card { background: var(--vscode-input-background); padding: 20px; border-radius: 8px; text-align: center; }
+.badge { display: inline-block; padding: 5px 10px; margin: 5px; border-radius: 15px; background: var(--vscode-badge-background); }
+.locked { opacity: 0.5; }
+h2 { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; }
+</style></head>
+<body>
+<h1>📊 Your Git AutoPush Stats</h1>
+<div class="grid">
+<div class="card"><div class="stat">${stats.totalCommits}</div><div class="label">Total Commits</div></div>
+<div class="card"><div class="stat">🔥 ${stats.streak}</div><div class="label">Current Streak</div></div>
+<div class="card"><div class="stat">⭐ ${stats.longestStreak}</div><div class="label">Longest Streak</div></div>
+</div>
+<div class="card"><div class="stat">${stats.todayCommits}</div><div class="label">Commits Today</div></div>
+<div class="achievements"><h2>🏆 Achievements (${earned.length}/${allAch.length})</h2>
+<div>${earned.map(a => `<span class="badge">${a}</span>`).join('')}${locked.map(a => `<span class="badge locked">${a}</span>`).join('')}</div>
+</div>
+</body></html>`;
+    });
+    context.subscriptions.push(showStatsCmd);
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 📜 SHOW HISTORY COMMAND
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    const showHistoryCmd = vscode.commands.registerCommand('git-autopush.showHistory', async () => {
+        const stats = getStats();
+        if (stats.commitHistory.length === 0) {
+            vscode.window.showInformationMessage('No commit history yet!');
+            return;
+        }
+        const items = stats.commitHistory.map((c, i) => ({
+            label: `${i + 1}. ${c.message}`,
+            description: new Date(c.timestamp).toLocaleString()
+        }));
+        await vscode.window.showQuickPick(items, { placeHolder: '📜 Recent Commits' });
+    });
+    context.subscriptions.push(showHistoryCmd);
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ↩️ UNDO LAST COMMIT
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    const undoLastCommitCmd = vscode.commands.registerCommand('git-autopush.undoLastCommit', async () => {
+        if (!lastCommitInfo) {
+            vscode.window.showWarningMessage('No recent commit to undo');
+            return;
+        }
+        
+        try {
+            const currentHead = require('child_process')
+                .execSync('git rev-parse HEAD', { cwd: lastCommitInfo.workspace, stdio: ['ignore', 'pipe', 'ignore'] })
+                .toString().trim();
+            
+            if (currentHead !== lastCommitInfo.hash) {
+                vscode.window.showWarningMessage('HEAD has changed - cannot undo');
+                return;
+            }
+        } catch (e) {
+            vscode.window.showErrorMessage('Failed to verify commit');
+            return;
+        }
+        
+        const confirm = await vscode.window.showWarningMessage(
+            `Undo: "${lastCommitInfo.message.slice(0, 50)}..."?`,
+            { modal: true },
+            'Soft Reset (keep changes)',
+            'Hard Reset (discard)'
+        );
+        
+        if (!confirm) return;
+        
+        const resetType = confirm.includes('Hard') ? '--hard' : '--soft';
+        const cmd = `cd "${lastCommitInfo.workspace}" && git reset ${resetType} HEAD~1`;
+        
+        terminal.show(true);
+        terminal.sendText(cmd, true);
+        vscode.window.showInformationMessage(`Commit undone (${resetType.replace('--', '')})`);
+        lastCommitInfo = null;
+        updateStatusBar();
+    });
+    context.subscriptions.push(undoLastCommitCmd);
+    
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 🔧 OTHER COMMANDS
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
     const toggleAutoCommit = vscode.commands.registerCommand('git-autopush.toggleAutoCommit', async () => {
-        const cfg = vscode.workspace.getConfiguration('gitAutopush')
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const cur = cfg.get('autoCommit', false);
         await cfg.update('autoCommit', !cur, vscode.ConfigurationTarget.Workspace);
-        out.appendLine(`git-autopush: autoCommit set -> ${!cur}`);
         updateStatusBar();
-        vscode.window.showInformationMessage(`git-autopush: autoCommit -> ${!cur}`);
+        vscode.window.showInformationMessage(`Auto Commit: ${!cur ? 'ON' : 'OFF'}`);
     });
     context.subscriptions.push(toggleAutoCommit);
-
+    
     const toggleAutoPush = vscode.commands.registerCommand('git-autopush.toggleAutoPush', async () => {
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const cur = cfg.get('autoPush', false);
         await cfg.update('autoPush', !cur, vscode.ConfigurationTarget.Workspace);
-        out.appendLine(`git-autopush: autoPush set -> ${!cur}`);
         updateStatusBar();
-        vscode.window.showInformationMessage(`git-autopush: autoPush -> ${!cur}`);
+        vscode.window.showInformationMessage(`Auto Push: ${!cur ? 'ON' : 'OFF'}`);
     });
     context.subscriptions.push(toggleAutoPush);
-
+    
     const setApiKeyCmd = vscode.commands.registerCommand('git-autopush.setApiKey', async () => {
         try {
-            const value = await vscode.window.showInputBox({ prompt: 'Enter AI provider API key (stored machine-local)', placeHolder: '', ignoreFocusOut: true, password: true });
-            if (typeof value === 'string') {
-                const cfg = vscode.workspace.getConfiguration('gitAutopush');
-                // Store machine-local to avoid syncing credentials
-                await cfg.update('ai.apiKey', value, vscode.ConfigurationTarget.Machine);
-                vscode.window.showInformationMessage('git-autopush: API key saved (machine-local).');
+            const value = await vscode.window.showInputBox({ 
+                prompt: 'Enter API key (sk-or-...)', 
+                placeHolder: 'sk-or-v1-...', 
+                ignoreFocusOut: true, 
+                password: true 
+            });
+            if (typeof value === 'string' && value.trim()) {
+                await vscode.workspace.getConfiguration('gitAutopush').update('ai.apiKey', value.trim(), vscode.ConfigurationTarget.Machine);
+                vscode.window.showInformationMessage('API key saved ✅');
             }
         }
         catch (e) {
-            // never log keys or values
-            vscode.window.showErrorMessage('git-autopush: failed to save API key.');
+            vscode.window.showErrorMessage('Failed to save API key');
         }
     });
     context.subscriptions.push(setApiKeyCmd);
-
+    
     const generateMessageCmd = vscode.commands.registerCommand('git-autopush.generateMessage', async () => {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            vscode.window.showWarningMessage('git-autopush: no active editor');
-            return;
-        }
-        const doc = editor.document;
-        const cfg = vscode.workspace.getConfiguration('gitAutopush');
-        const aiEnabled = cfg.get('ai.enabled', false);
-        const generate = cfg.get('ai.generateCommitMessage', false);
-        const review = cfg.get('ai.reviewBeforeCommit', true);
-        const provider = cfg.get('ai.provider', 'deepseek');
-        const apiKey = cfg.get('ai.apiKey', '');
-        const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
-        if (!aiEnabled || !generate) {
-            vscode.window.showInformationMessage('git-autopush: AI commit generation is disabled (enable via settings).');
-            return;
-        }
-
-        // Prepare a deterministic fallback message
-        const fallback = `Saved: ${path.basename(rel)}`;
-
-        // Helper to store and present suggested message
-        async function presentSuggested(suggested) {
-            if (review) {
-                const edited = await vscode.window.showInputBox({ value: suggested, prompt: 'Edit AI-generated commit message', ignoreFocusOut: true });
-                if (typeof edited === 'string') {
-                    context.workspaceState.update('gitAutopush.lastAIMessage', edited);
-                    vscode.window.showInformationMessage('git-autopush: commit message ready. Use Run Once to execute.');
-                }
-                else {
-                    vscode.window.showInformationMessage('git-autopush: message review cancelled.');
-                }
-            }
-            else {
-                context.workspaceState.update('gitAutopush.lastAIMessage', suggested);
-                vscode.window.showInformationMessage('git-autopush: AI message generated and stored (use Run Once to apply).');
-            }
-            updateStatusBar();
-        }
-
-        // Fallback deterministic message (used if DeepSeek is unavailable)
-        // We'll attempt DeepSeek below; if it fails we'll present the fallback.
-        // Note: generateMessage command is deprecated - use Save+Run flow instead which calls OpenRouter endpoint
-
-        // Fallback deterministic message
-        await presentSuggested(fallback);
+        vscode.window.showInformationMessage('Use Ctrl+S to generate AI commit messages');
     });
     context.subscriptions.push(generateMessageCmd);
-
+    
     const debugDeepseekCmd = vscode.commands.registerCommand('git-autopush.debugDeepseek', async () => {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            vscode.window.showWarningMessage('git-autopush: no active editor');
-            return;
-        }
-        const doc = editor.document;
+        if (!editor) { vscode.window.showWarningMessage('No active editor'); return; }
+        
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
-        const aiEnabled = cfg.get('ai.enabled', false);
-        const generate = cfg.get('ai.generateCommitMessage', false);
-        const provider = cfg.get('ai.provider', 'deepseek');
-        // Use same key resolution priority as main flow
         const key = cfg.get('ai.apiKey', '') || cfg.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
         const model = cfg.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
-
-        if (!aiEnabled || !generate) {
-            vscode.window.showInformationMessage('git-autopush: AI commit generation is disabled (enable via settings).');
-            return;
-        }
-        if (provider !== 'deepseek') {
-            vscode.window.showInformationMessage('git-autopush: provider is not set to deepseek.');
-            return;
-        }
-        if (!key) {
-            vscode.window.showWarningMessage('git-autopush: DeepSeek API key not configured. Use the Set AI API Key command or set DEEPSEEK_API_KEY.');
-            return;
-        }
-
-        out.appendLine('git-autopush: Debug DeepSeek — sending raw request...');
+        
+        if (!key) { vscode.window.showWarningMessage('No API key'); return; }
+        
+        out.appendLine('Debug API call...');
         out.show(true);
-
+        
         try {
             const https = require('https');
-            const rel = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? path.relative(vscode.workspace.workspaceFolders[0].uri.fsPath, doc.uri.fsPath) : doc.uri.fsPath;
-            const bodyText = doc.getText().slice(0, 2000);
-            const systemPrompt = `You are a helpful assistant that writes concise, conventional git commit messages. Return a short subject line (<=50 chars) followed by an optional body <=72 chars per line.`;
-            const userPrompt = `Generate a commit message for the following changes:\n\nFile: ${rel}\n\nContents excerpt:\n${bodyText}`;
-            const payload = JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] });
-            const urlOpts = { hostname: 'openrouter.ai', port: 443, path: '/api/v1/chat/completions', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': `Bearer ${key}` } };
-
+            const doc = editor.document;
+            const excerpt = doc.getText().slice(0, 1000);
+            const payload = JSON.stringify({ model, messages: [{ role: 'user', content: `Summarize: ${excerpt}` }] });
+            
             const raw = await new Promise((resolve, reject) => {
-                const req = https.request(urlOpts, (res) => {
+                const req = https.request({
+                    hostname: 'openrouter.ai', port: 443, path: '/api/v1/chat/completions', method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': `Bearer ${key}` }
+                }, (res) => {
                     let data = '';
                     res.on('data', (c) => data += c);
                     res.on('end', () => resolve(data));
                 });
                 req.on('error', reject);
-                req.setTimeout(15000, () => { req.destroy(new Error('DeepSeek request timeout')); });
+                req.setTimeout(15000);
                 req.write(payload);
                 req.end();
             });
-
-            let parsed;
-            try { parsed = JSON.parse(raw); } catch (e) { parsed = raw; }
-            out.appendLine('git-autopush: DeepSeek raw response:');
-            out.appendLine(typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2));
-            vscode.window.showInformationMessage('git-autopush: DeepSeek raw response written to debug output.');
+            
+            out.appendLine('Response:');
+            try { out.appendLine(JSON.stringify(JSON.parse(raw), null, 2)); } catch (e) { out.appendLine(raw); }
         }
         catch (e) {
-            out.appendLine('git-autopush: DeepSeek debug call failed: ' + (e?.message || String(e)));
-            vscode.window.showErrorMessage('git-autopush: DeepSeek debug call failed. See debug output.');
+            out.appendLine('Failed: ' + (e?.message || e));
         }
     });
     context.subscriptions.push(debugDeepseekCmd);
-
+    
     const pauseCmd = vscode.commands.registerCommand('git-autopush.pause', async () => {
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const cur = cfg.get('autoCommit', false);
         await cfg.update('autoCommit', !cur, vscode.ConfigurationTarget.Workspace);
-        out.appendLine(`git-autopush: pause toggled -> autoCommit ${!cur}`);
         updateStatusBar();
-        vscode.window.showInformationMessage(`git-autopush: autoCommit -> ${!cur}`);
+        vscode.window.showInformationMessage(`Git AutoPush: ${!cur ? 'Resumed' : 'Paused'}`);
     });
     context.subscriptions.push(pauseCmd);
-
+    
     const runOnceCmd = vscode.commands.registerCommand('git-autopush.runOnce', async () => {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            vscode.window.showWarningMessage('git-autopush: no active editor to run on');
-            return;
-        }
-        const doc = editor.document;
+        if (!editor) { vscode.window.showWarningMessage('No active editor'); return; }
+        
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const dryRun = cfg.get('dryRun', true);
         const autoPush = cfg.get('autoPush', false);
-        const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        const rel = workspaceFolder ? path.relative(workspaceFolder, doc.uri.fsPath) : doc.uri.fsPath;
-
-        // Get branch info
-        let branch = '';
-        try {
-            branch = require('child_process').execSync('git symbolic-ref --short HEAD', { cwd: workspaceFolder, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-        }
-        catch (e) {
-            try {
-                branch = require('child_process').execSync('git rev-parse --short HEAD', { cwd: workspaceFolder, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-            }
-            catch (e2) { branch = 'HEAD'; }
-        }
-
-        const message = `Manual run: ${path.basename(rel)}`;
-        const commitMsgEsc = message.replace(/"/g, '\\"');
-        const gitCmds = [];
-        gitCmds.push('git add -A');
-        gitCmds.push(`git commit -m "${commitMsgEsc}" || echo "git-autopush: nothing to commit"`);
-        if (!dryRun && autoPush) {
-            const remote = 'origin';
-            gitCmds.push(`git push ${remote} ${branch}`);
-        }
-        const cwdPrefix = workspaceFolder ? `cd "${workspaceFolder.replace(/"/g, '\\"')}" && ` : '';
-        const fullCmd = cwdPrefix + gitCmds.join(' && ');
-        out.appendLine(`git-autopush: manual command -> ${fullCmd}`);
-        context.workspaceState.update('gitAutopush.lastAction', new Date().toISOString());
-        updateStatusBar();
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        const rel = workspaceFolder ? path.relative(workspaceFolder, editor.document.uri.fsPath) : editor.document.uri.fsPath;
+        
+        let branch = 'HEAD';
+        try { branch = require('child_process').execSync('git symbolic-ref --short HEAD', { cwd: workspaceFolder, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) { }
+        
+        const message = `Manual: ${path.basename(rel)}`;
+        const gitCmds = ['git add -A', `git commit -m "${message.replace(/"/g, '\\"')}" || echo "nothing to commit"`];
+        if (!dryRun && autoPush) gitCmds.push(`git push origin ${branch}`);
+        
+        const cmd = workspaceFolder ? `cd "${workspaceFolder}" && ${gitCmds.join(' && ')}` : gitCmds.join(' && ');
+        
         terminal.show(true);
         if (!dryRun) {
-            terminal.sendText(fullCmd, true);
+            terminal.sendText(cmd, true);
+            updateStats(message);
+            vscode.window.showInformationMessage('Manual commit done');
+        } else {
+            out.appendLine('Dry run: ' + cmd);
+            out.show();
         }
-        else {
-            out.appendLine('git-autopush: dryRun enabled — not executing git commands');
-        }
+        updateStatusBar();
     });
     context.subscriptions.push(runOnceCmd);
-
+    
     const saveAndRunCmd = vscode.commands.registerCommand('git-autopush.saveAndRun', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
-            // fallback to normal save if no active editor
             await vscode.commands.executeCommand('workbench.action.files.save');
             return;
         }
-        // Store the exact document path as a one-time token so only this save triggers.
         const docPath = editor.document.uri.fsPath;
-        // token expires shortly to avoid stale tokens (5 seconds) and include an in-memory nonce
         const expires = Date.now() + 5000;
         const nonce = Math.random().toString(36).slice(2);
         await context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', { path: docPath, nonce, expires });
         triggerNonces.set(docPath, nonce);
-        out.appendLine(`git-autopush: saveAndRun token set for ${docPath} (expires=${expires}, nonce=${nonce})`);
-        // perform the normal save action; onDidSave will observe the token
+        out.appendLine(`git-autopush: saveAndRun for ${docPath}`);
         await vscode.commands.executeCommand('workbench.action.files.save');
     });
     context.subscriptions.push(saveAndRunCmd);
-
+    
+    // Startup message
+    const stats = getStats();
+    if (stats.streak > 0) {
+        out.appendLine(`git-autopush: Welcome! 🔥 ${stats.streak} day streak, ${stats.totalCommits} total commits`);
+    }
+    
     context.subscriptions.push(statusBar);
+    out.appendLine('git-autopush: Extension activated ✅');
 }
+
 exports.activate = activate;
 function deactivate() { }
 exports.deactivate = deactivate;

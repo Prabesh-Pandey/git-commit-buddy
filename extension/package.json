@@ -1,15 +1,16 @@
 {
   "name": "git-autopush-on-save",
   "displayName": "Git AutoPush on Save",
-  "description": "Run git-autopush.sh automatically when files matching configured globs are saved.",
+  "description": "AI-powered automatic git commits with gamification, streak tracking, and one-click undo. Press Ctrl+S to commit with AI-generated messages.",
   "publisher": "local",
   "repository": {
     "type": "git",
     "url": "https://github.com/local/git-autopush-on-save.git"
   },
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {"vscode": "^1.60.0"},
-  "categories": ["Other"],
+  "categories": ["Other", "SCM Providers"],
+  "keywords": ["git", "commit", "autopush", "ai", "deepseek", "productivity", "automation"],
   "contributes": {
     "commands": [
       {
@@ -22,7 +23,7 @@
       },
       {
         "command": "git-autopush.setApiKey",
-        "title": "Git AutoPush: Set AI API Key (machine-local)"
+        "title": "Git AutoPush: Set AI API Key"
       },
       {
         "command": "git-autopush.generateMessage",
@@ -30,7 +31,7 @@
       },
       {
         "command": "git-autopush.debugDeepseek",
-        "title": "Git AutoPush: Debug DeepSeek Response"
+        "title": "Git AutoPush: Debug AI Response"
       },
       {
         "command": "git-autopush.runOnce",
@@ -39,11 +40,26 @@
       {
         "command": "git-autopush.pause",
         "title": "Git AutoPush: Pause/Resume"
-      }
-      ,
+      },
       {
         "command": "git-autopush.saveAndRun",
-        "title": "Git AutoPush: Save & Run (Ctrl+S)"
+        "title": "Git AutoPush: Save & Commit (Ctrl+S)"
+      },
+      {
+        "command": "git-autopush.showQuickActions",
+        "title": "Git AutoPush: Quick Actions Menu"
+      },
+      {
+        "command": "git-autopush.showStats",
+        "title": "Git AutoPush: View Stats & Achievements"
+      },
+      {
+        "command": "git-autopush.showHistory",
+        "title": "Git AutoPush: View Commit History"
+      },
+      {
+        "command": "git-autopush.undoLastCommit",
+        "title": "Git AutoPush: Undo Last Commit"
       }
     ],
     "keybindings": [
@@ -79,7 +95,7 @@
         "gitAutopush.watchGlobs": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["**/*.{py,js,ts,md,json,txt}"],
+          "default": ["**/*.{py,js,ts,md,json,txt,jsx,tsx,css,html}"],
           "description": "Glob patterns of files to watch for saves."
         },
         "gitAutopush.protectedBranches": {
@@ -91,10 +107,20 @@
         "gitAutopush.sensitiveFileGlobs": {
           "type": "array",
           "items": { "type": "string" },
-          "default": [".env", "*.key", "credentials.json", "*.pem"],
+          "default": [".env", "*.key", "credentials.json", "*.pem", "*.secret"],
           "description": "File globs that must never be auto-committed."
-        }
-        ,"gitAutopush.ai.enabled": {
+        },
+        "gitAutopush.useEmoji": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include emojis in AI-generated commit messages."
+        },
+        "gitAutopush.showStatsInStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show commit streak in status bar."
+        },
+        "gitAutopush.ai.enabled": {
           "type": "boolean",
           "default": false,
           "description": "Enable AI-generated commit messages (opt-in)."
@@ -103,53 +129,41 @@
           "type": "string",
           "default": "deepseek",
           "enum": ["deepseek"],
-          "description": "AI provider to use for generating commit messages. Currently only DeepSeek is supported."
+          "description": "AI provider for commit messages."
         },
         "gitAutopush.ai.apiKey": {
           "type": "string",
           "default": "",
-          "description": "OpenRouter API key for DeepSeek. Get yours at https://openrouter.ai/keys. Stored machine-locally (never synced or logged). Format: sk-or-v1-...",
+          "description": "OpenRouter API key (sk-or-...). Get yours at https://openrouter.ai/keys",
           "scope": "machine"
         },
         "gitAutopush.ai.deepseekApiKey": {
           "type": "string",
           "default": "",
-          "description": "[DEPRECATED] Use gitAutopush.ai.apiKey instead. This setting is kept for backward compatibility only.",
+          "description": "[DEPRECATED] Use gitAutopush.ai.apiKey instead.",
           "scope": "machine",
           "deprecationMessage": "Use gitAutopush.ai.apiKey instead"
         },
         "gitAutopush.ai.deepseekModel": {
           "type": "string",
           "default": "deepseek/deepseek-r1-0528:free",
-          "description": "DeepSeek model identifier to use for commit message generation.",
-          "scope": "machine"
+          "description": "AI model to use for commit messages."
         },
         "gitAutopush.ai.generateCommitMessage": {
           "type": "boolean",
           "default": false,
-          "description": "When true, attempt to generate commit messages via AI (requires opt-in and API key)."
-        },
-        "gitAutopush.ai.deepseekUrl": {
-          "type": "string",
-          "default": "",
-          "description": "(Optional) DeepSeek API URL to use when `ai.provider` is set to `deepseek`. If empty, default DeepSeek endpoint will be used."
+          "description": "Generate commit messages via AI (requires API key)."
         },
         "gitAutopush.ai.reviewBeforeCommit": {
           "type": "boolean",
           "default": true,
-          "description": "When true, present the AI-generated commit message for user review/edit before committing."
+          "description": "Review AI message before committing."
         }
       }
     }
   },
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:git-autopush.toggleAutoCommit",
-    "onCommand:git-autopush.toggleAutoPush",
-    "onCommand:git-autopush.runOnce",
-    "onCommand:git-autopush.saveAndRun",
-    "onCommand:git-autopush.debugDeepseek",
-    "onCommand:git-autopush.pause"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "scripts": {
