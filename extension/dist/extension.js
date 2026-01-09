@@ -292,9 +292,11 @@ function activate(context) {
             // Use Google Gemini 2.0 Flash - fast, accurate, and FREE
             const deepseekModel = config.get('ai.deepseekModel', 'google/gemini-2.0-flash-exp:free');
             
-            out.appendLine(`git-autopush: AI config - enabled=${aiEnabled}, generate=${generate}, provider=${provider}, hasKey=${!!deepseekKey}, model=${deepseekModel}`);
+            out.appendLine(`git-autopush: AI config - enabled=${aiEnabled}, generate=${generate}, provider=${provider}, hasKey=${!!deepseekKey}, keyLen=${deepseekKey?.length || 0}, model=${deepseekModel}`);
             
-            if (aiEnabled && generate && provider === 'deepseek') {
+            // Run AI if enabled and generate is on
+            if (aiEnabled && generate) {
+                // Prompt for key if missing
                 if (!deepseekKey) {
                     out.appendLine('git-autopush: No API key found, prompting user...');
                     try {
@@ -323,6 +325,7 @@ function activate(context) {
                     }
                 }
                 
+                // Generate message if we have a key
                 if (deepseekKey) {
                     out.appendLine(`git-autopush: generating AI message with ${deepseekModel}...`);
                     
@@ -337,6 +340,11 @@ function activate(context) {
                             const systemPrompt = `You write git commit messages. Rules:
 1. Max 50 characters
 2. Imperative mood (Add, Fix, Update, Remove)
+3. No period at end
+4. ${emojiNote}
+5. Be specific about what changed
+
+Reply with ONLY the commit message, nothing else.`;
 3. No period at end
 4. ${emojiNote}
 5. Be specific about what changed
