@@ -289,7 +289,8 @@ function activate(context) {
             const generate = config.get('ai.generateCommitMessage', false);
             const provider = config.get('ai.provider', 'deepseek');
             let deepseekKey = config.get('ai.apiKey', '') || config.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
-            const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-r1-0528:free');
+            // Use deepseek-chat instead of R1 - R1 is for reasoning, not simple generation
+            const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-chat');
             
             if (aiEnabled && generate && provider === 'deepseek') {
                 if (!deepseekKey) {
@@ -325,12 +326,15 @@ function activate(context) {
                     }, async () => {
                         try {
                             const https = require('https');
-                            const emojiNote = useEmoji ? 'Use a relevant emoji at start.' : 'No emojis.';
-                            const systemPrompt = `You are a commit message expert. Write ONE concise conventional commit message.
-RULES:
-- Subject: max 50 chars, imperative mood (Add, Fix, Update), no period
-- ${emojiNote}
-- Output ONLY the commit message. No quotes, no explanation, no markdown.`;
+                            const emojiNote = useEmoji ? 'Start with a relevant emoji.' : '';
+                            const systemPrompt = `You write git commit messages. Rules:
+1. Max 50 characters
+2. Imperative mood (Add, Fix, Update, Remove)
+3. No period at end
+4. ${emojiNote}
+5. Be specific about what changed
+
+Reply with ONLY the commit message, nothing else.`;
                             
                             let diffText = '';
                             try {
@@ -351,7 +355,7 @@ RULES:
                             const ext = path.extname(rel).toLowerCase();
                             const fileType = { '.js': 'JavaScript', '.ts': 'TypeScript', '.py': 'Python', '.md': 'Markdown', '.json': 'JSON' }[ext] || 'code';
                             
-                            const userPrompt = `Generate commit message for ${fileType} changes:\n\nFile: ${rel}\n\nDiff:\n${diffText}`;
+                            const userPrompt = `Write a commit message for this diff:\n\n${diffText || 'File: ' + rel}`;
                             
                             const payload = JSON.stringify({ 
                                 model: deepseekModel, 
@@ -391,69 +395,26 @@ RULES:
                                                 return reject(new Error(json.error.message || 'API error'));
                                             }
                                             
-                                            const candidates = [];
-                                            if (json.choices && json.choices[0]) {
-                                                const msg = json.choices[0].message;
-                                                // PRIORITY 1: content field (final answer for most models)
-                                                if (msg?.content && msg.content.trim()) candidates.push(msg.content.trim());
-                                                // PRIORITY 2: reasoning field (DeepSeek R1 thinking) - needs extraction
-                                                // Note: We only use reasoning if content is empty
-                                            }
-                                            
-                                            let raw = candidates.find(c => c && c.length > 0);
-                                            
-                                            // If content was empty, try to extract from reasoning
-                                            if (!raw && json.choices && json.choices[0]?.message?.reasoning) {
-                                                const reasoning = json.choices[0].message.reasoning;
-                                                out.appendLine(`git-autopush: extracting from reasoning (${reasoning.length} chars)`);
-                                                
-                                                // Look for the actual commit message in reasoning
-                                                // DeepSeek R1 often concludes with the final answer
-                                                const extractPatterns = [
-                                                    /(?:final commit message|the commit message|my answer|output)[:\s]*["'`]([^"'`\n]{10,80})["'`]/i,
-                                                    /(?:final commit message|the commit message)[:\s]*\n*([A-Z][^\n]{10,80})/i,
-                                                    /```\n?([^\n`]{10,80})\n?```/,
-                                                    /["']([A-Z][a-z]+(?:\([^)]+\))?[:\s][^\n"']{10,60})["']/,
-                                                ];
-                                                
-                                                for (const pattern of extractPatterns) {
-                                                    const match = reasoning.match(pattern);
-                                                    if (match && match[1]) {
-                                                        raw = match[1].trim();
-                                                        out.appendLine(`git-autopush: found in reasoning: ${raw}`);
-                                                        break;
-                                                    }
-                                                }
-                                                
-                                                // Last resort: find conventional commit format line
-                                                if (!raw) {
-                                                    const lines = reasoning.split('\n');
-                                                    for (let i = lines.length - 1; i >= 0; i--) {
-                                                        const line = lines[i].trim();
-                                                        // Match conventional commit format: type: message or type(scope): message
-                                                        if (/^(feat|fix|docs|style|refactor|test|chore|perf|build|ci)(\([^)]+\))?:\s+\S/i.test(line)) {
-                                                            raw = line;
-                                                            out.appendLine(`git-autopush: found conventional commit: ${raw}`);
-                                                            break;
-                                                        }
-                                                        // Match emoji + verb format
-                                                        if (/^[🎉✨🐛📚💄♻️🧪🔧⚡]\s*[A-Z][a-z]+/.test(line) && line.length >= 15 && line.length <= 80) {
-                                                            raw = line;
-                                                            out.appendLine(`git-autopush: found emoji commit: ${raw}`);
-                                                            break;
-                                                        }
-                                                    }
-                                                }
+                                            // Extract the commit message from response
+                                            let raw = '';
+                                            if (json.choices && json.choices[0]?.message?.content) {
+                                                raw = json.choices[0].message.content.trim();
                                             }
                                             
                                             if (!raw) return reject(new Error('Empty response'));
                                             
-                                            // Clean up the message - remove prompt echoes
+                                            // Clean up - remove quotes, markdown, etc.
                                             let processed = raw
-                                                .replace(/^generate commit message.*?:/i, '')
-                                                .replace(/^["'`]+|["'`]+$/g, '')
-                                                .replace(/^\s*commit message[:\s]*/i, '')
+                                                .split('\n')[0]  // Take first line only
+                                                .replace(/^["'`]+|["'`]+$/g, '')  // Remove quotes
+                                                .replace(/^\*+|\*+$/g, '')  // Remove asterisks
+                                                .replace(/^#+\s*/, '')  // Remove markdown headers
                                                 .trim();
+                                            
+                                            // Truncate if too long
+                                            if (processed.length > 72) {
+                                                processed = processed.slice(0, 69) + '...';
+                                            }
                                             resolve(processed);
                                         }
                                         catch (e) { 
