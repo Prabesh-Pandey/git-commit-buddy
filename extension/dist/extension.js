@@ -325,7 +325,7 @@ function activate(context) {
                     }
                 }
                 
-                // Generate message if we have api key
+                // Generate message if we have API key
                 if (deepseekKey) {
                     out.appendLine(`git-autopush: generating AI message with ${deepseekModel}...`);
                     
