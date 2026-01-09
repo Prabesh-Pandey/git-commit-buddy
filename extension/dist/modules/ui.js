@@ -51,23 +51,39 @@ function createUIManager({ getStats, outputChannel }) {
 
             statusBar.text = text;
 
-            // Build tooltip
+            // Build tooltip - cleaner layout with proper spacing
+            const commitStatus = autoCommit ? '✅ On' : '⭕ Off';
+            const pushStatus = autoPush ? '✅ On' : '⭕ Off';
+            const dryStatus = dryRun ? '⚠️ Active' : '✅ Disabled';
+
             const tooltipLines = [
-                `**Git AutoPush** $(git-commit)`,
+                `## 🚀 Git AutoPush`,
+                ``,
+                `| Setting | Status |`,
+                `|:--------|:-------|`,
+                `| Auto Commit | ${commitStatus} |`,
+                `| Auto Push | ${pushStatus} |`,
+                `| Dry Run | ${dryStatus} |`,
+                ``,
                 `---`,
-                `Auto Commit: ${autoCommit ? '✅ On' : '○ Off'}`,
-                `Auto Push: ${autoPush ? '✅ On' : '○ Off'}`,
-                `Dry Run: ${dryRun ? '⚠️ Yes' : '✓ No'}`,
+                ``,
+                `### 📊 Statistics`,
+                ``,
+                `| Metric | Value |`,
+                `|:-------|------:|`,
+                `| Total Commits | **${stats.totalCommits}** |`,
+                `| Today | **${stats.todayCommits}** |`,
+                `| 🔥 Streak | **${stats.streak}d** |`,
+                `| ⭐ Best | **${stats.longestStreak}d** |`,
+                ``,
                 `---`,
-                `**📊 Statistics**`,
-                `Total: ${stats.totalCommits} │ Today: ${stats.todayCommits}`,
-                `🔥 Streak: ${stats.streak}d │ ⭐ Best: ${stats.longestStreak}d`,
-                `---`,
-                `*Click for quick actions*`
+                ``,
+                `*Click for quick actions menu*`
             ];
 
             statusBar.tooltip = new vscode.MarkdownString(tooltipLines.join('\n'));
             statusBar.tooltip.isTrusted = true;
+            statusBar.tooltip.supportHtml = true;
             
             // Warning background if active and not dry run
             statusBar.backgroundColor = autoCommit && !dryRun
