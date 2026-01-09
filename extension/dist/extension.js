@@ -292,32 +292,39 @@ function activate(context) {
             // Use Google Gemini 2.0 Flash - fast, accurate, and FREE
             const deepseekModel = config.get('ai.deepseekModel', 'google/gemini-2.0-flash-exp:free');
             
+            out.appendLine(`git-autopush: AI config - enabled=${aiEnabled}, generate=${generate}, provider=${provider}, hasKey=${!!deepseekKey}, model=${deepseekModel}`);
+            
             if (aiEnabled && generate && provider === 'deepseek') {
                 if (!deepseekKey) {
+                    out.appendLine('git-autopush: No API key found, prompting user...');
                     try {
                         const entered = await vscode.window.showInputBox({ 
-                            prompt: 'Enter your OpenRouter API key', 
-                            placeHolder: 'sk-or-v1-...', 
+                            prompt: '🔑 Enter your OpenRouter API key (get free at openrouter.ai/keys)', 
+                            placeHolder: 'sk-or-v1-xxxxxxxxxxxx', 
                             ignoreFocusOut: true, 
                             password: true,
                             validateInput: (value) => {
-                                if (!value || value.trim().length < 10) return 'API key too short';
-                                if (!value.startsWith('sk-')) return 'Should start with sk-';
+                                if (!value || value.trim().length < 20) return 'API key too short';
+                                if (!value.startsWith('sk-or-')) return 'OpenRouter keys start with sk-or-';
                                 return null;
                             }
                         });
                         if (typeof entered === 'string' && entered.trim()) {
-                            await config.update('ai.apiKey', entered.trim(), vscode.ConfigurationTarget.Machine);
+                            await config.update('ai.apiKey', entered.trim(), vscode.ConfigurationTarget.Global);
                             deepseekKey = entered.trim();
+                            out.appendLine('git-autopush: API key saved successfully!');
+                            vscode.window.showInformationMessage('✅ API key saved!');
+                        } else {
+                            out.appendLine('git-autopush: User cancelled API key input');
                         }
                     }
                     catch (err) {
-                        out.appendLine('git-autopush: API key save failed');
+                        out.appendLine('git-autopush: API key save failed: ' + err?.message);
                     }
                 }
                 
                 if (deepseekKey) {
-                    out.appendLine('git-autopush: generating AI message...');
+                    out.appendLine(`git-autopush: generating AI message with ${deepseekModel}...`);
                     
                     await vscode.window.withProgress({
                         location: vscode.ProgressLocation.Notification,
@@ -510,6 +517,8 @@ Reply with ONLY the commit message, nothing else.`;
         const autoPush = cfg.get('autoPush', false);
         const dryRun = cfg.get('dryRun', true);
         const stats = getStats();
+        const apiKey = cfg.get('ai.apiKey', '');
+        const hasKey = apiKey && apiKey.length > 10;
         
         const items = [
             { label: `$(git-commit) Auto Commit: ${autoCommit ? 'ON ✅' : 'OFF'}`, description: 'Toggle auto commits', action: 'toggleCommit' },
@@ -521,7 +530,7 @@ Reply with ONLY the commit message, nothing else.`;
             { label: '', kind: vscode.QuickPickItemKind.Separator },
             { label: '$(graph) View Stats', description: `${stats.totalCommits} commits, ${stats.streak} day streak`, action: 'stats' },
             { label: '$(history) Commit History', description: 'Recent commits', action: 'history' },
-            { label: '$(key) Set API Key', description: 'Configure AI key', action: 'apiKey' },
+            { label: `$(key) API Key: ${hasKey ? '✅ Set' : '❌ Missing'}`, description: hasKey ? 'Key configured' : 'Click to add key', action: 'apiKey' },
             { label: '$(output) View Debug Log', description: 'Open debug output', action: 'log' },
         ];
         
@@ -685,20 +694,43 @@ h2 { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; 
     context.subscriptions.push(toggleAutoPush);
     
     const setApiKeyCmd = vscode.commands.registerCommand('git-autopush.setApiKey', async () => {
+        // Show helpful message first
+        const action = await vscode.window.showInformationMessage(
+            '🔑 You need an OpenRouter API key (free)',
+            'Get Free Key',
+            'I have a key'
+        );
+        
+        if (action === 'Get Free Key') {
+            vscode.env.openExternal(vscode.Uri.parse('https://openrouter.ai/keys'));
+            vscode.window.showInformationMessage('After getting your key, run this command again to enter it');
+            return;
+        }
+        
+        if (action !== 'I have a key') return;
+        
         try {
             const value = await vscode.window.showInputBox({ 
-                prompt: 'Enter API key (sk-or-...)', 
-                placeHolder: 'sk-or-v1-...', 
+                prompt: 'Paste your OpenRouter API key here', 
+                placeHolder: 'sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx', 
                 ignoreFocusOut: true, 
-                password: true 
+                password: true,
+                validateInput: (v) => {
+                    if (!v || v.trim().length < 20) return 'Key is too short';
+                    if (!v.startsWith('sk-or-')) return 'OpenRouter keys start with sk-or-';
+                    return null;
+                }
             });
             if (typeof value === 'string' && value.trim()) {
-                await vscode.workspace.getConfiguration('gitAutopush').update('ai.apiKey', value.trim(), vscode.ConfigurationTarget.Machine);
-                vscode.window.showInformationMessage('API key saved ✅');
+                // Save to Global (User) settings - more reliable than Machine
+                await vscode.workspace.getConfiguration('gitAutopush').update('ai.apiKey', value.trim(), vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage('✅ API key saved! Now press Ctrl+S to test.');
+                out.appendLine('git-autopush: API key saved to user settings');
             }
         }
         catch (e) {
-            vscode.window.showErrorMessage('Failed to save API key');
+            vscode.window.showErrorMessage('Failed to save API key: ' + e?.message);
+            out.appendLine('git-autopush: Failed to save API key: ' + e?.message);
         }
     });
     context.subscriptions.push(setApiKeyCmd);
