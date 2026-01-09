@@ -325,7 +325,7 @@ function activate(context) {
                     }
                 }
                 
-                // Generate message if we have a key
+                // Generate message if we have api key
                 if (deepseekKey) {
                     out.appendLine(`git-autopush: generating AI message with ${deepseekModel}...`);
                     
@@ -340,11 +340,6 @@ function activate(context) {
                             const systemPrompt = `You write git commit messages. Rules:
 1. Max 50 characters
 2. Imperative mood (Add, Fix, Update, Remove)
-3. No period at end
-4. ${emojiNote}
-5. Be specific about what changed
-
-Reply with ONLY the commit message, nothing else.`;
 3. No period at end
 4. ${emojiNote}
 5. Be specific about what changed
