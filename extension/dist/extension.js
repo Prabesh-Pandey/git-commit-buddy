@@ -281,7 +281,7 @@ function activate(context) {
         let message = `Saved: ${path.basename(rel)}`;
         
         // ═══════════════════════════════════════════════════════════════════════════
-        // 🤖 AI COMMIT MESSAGE GENERATION
+        // 🤖 AI COMMIT MESSAGE (GENERATION)
         // ═══════════════════════════════════════════════════════════════════════════
         
         try {
