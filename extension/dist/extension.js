@@ -28,6 +28,7 @@ const { createAIService } = require("./modules/ai-service");
 const { createGitOperations } = require("./modules/git-operations");
 const { createUIManager } = require("./modules/ui");
 const { registerCommands } = require("./modules/commands");
+const { getSmartMessageWithFile } = require("./modules/message-picker");
 
 /**
  * Extension activation
@@ -231,10 +232,11 @@ async function handleSave(doc, deps) {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🤖 GENERATE COMMIT MESSAGE (AI or Default)
+    // 🤖 GENERATE COMMIT MESSAGE (AI or Smart Default)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    let message = `Saved: ${path.basename(rel)}`;
+    // Start with smart contextual message as fallback
+    let message = getSmartMessageWithFile(doc.uri.fsPath, { useEmoji });
 
     try {
         const aiEnabled = config.get('ai.enabled', true);

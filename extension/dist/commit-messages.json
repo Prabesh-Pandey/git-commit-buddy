@@ -1,0 +1,340 @@
+{
+  "byExtension": {
+    ".js": [
+      "✨ Update JavaScript logic",
+      "🔧 Refactor JS module",
+      "🐛 Fix JavaScript bug",
+      "⚡ Optimize JS performance",
+      "🎨 Clean up JavaScript code"
+    ],
+    ".ts": [
+      "✨ Update TypeScript code",
+      "🔧 Refactor TS module",
+      "📝 Improve type definitions",
+      "🐛 Fix TypeScript errors",
+      "⚡ Optimize TS implementation"
+    ],
+    ".py": [
+      "🐍 Update Python script",
+      "🔧 Refactor Python module",
+      "🐛 Fix Python bug",
+      "⚡ Optimize Python code",
+      "📝 Improve Python docstrings"
+    ],
+    ".css": [
+      "🎨 Update styles",
+      "💄 Improve UI styling",
+      "🔧 Fix CSS layout",
+      "✨ Add new styles",
+      "🧹 Clean up CSS"
+    ],
+    ".scss": [
+      "🎨 Update SCSS styles",
+      "💄 Improve SCSS structure",
+      "🔧 Fix SCSS variables",
+      "✨ Add SCSS mixins"
+    ],
+    ".html": [
+      "🌐 Update HTML structure",
+      "✨ Improve HTML markup",
+      "♿ Enhance accessibility",
+      "🔧 Fix HTML elements"
+    ],
+    ".json": [
+      "📦 Update configuration",
+      "🔧 Modify JSON settings",
+      "📝 Update metadata",
+      "⚙️ Adjust config values"
+    ],
+    ".md": [
+      "📝 Update documentation",
+      "📚 Improve README",
+      "✏️ Fix typos in docs",
+      "📖 Add documentation"
+    ],
+    ".yml": [
+      "⚙️ Update YAML config",
+      "🔧 Modify workflow",
+      "📦 Update CI/CD settings"
+    ],
+    ".yaml": [
+      "⚙️ Update YAML config",
+      "🔧 Modify workflow",
+      "📦 Update CI/CD settings"
+    ],
+    ".sh": [
+      "📜 Update shell script",
+      "🔧 Fix bash script",
+      "⚡ Improve script efficiency"
+    ],
+    ".sql": [
+      "🗃️ Update database query",
+      "🔧 Modify SQL schema",
+      "⚡ Optimize SQL query"
+    ],
+    ".env": [
+      "🔐 Update environment variables",
+      "⚙️ Modify env config"
+    ],
+    ".gitignore": [
+      "🙈 Update gitignore rules",
+      "📝 Add ignore patterns"
+    ],
+    ".dockerfile": [
+      "🐳 Update Dockerfile",
+      "📦 Modify container config"
+    ],
+    ".vue": [
+      "💚 Update Vue component",
+      "🔧 Fix Vue logic",
+      "🎨 Improve Vue template"
+    ],
+    ".jsx": [
+      "⚛️ Update React component",
+      "🔧 Fix JSX logic",
+      "🎨 Improve React UI"
+    ],
+    ".tsx": [
+      "⚛️ Update React TypeScript",
+      "🔧 Fix TSX component",
+      "📝 Improve React types"
+    ],
+    ".svelte": [
+      "🧡 Update Svelte component",
+      "🔧 Fix Svelte logic"
+    ],
+    ".go": [
+      "🐹 Update Go code",
+      "🔧 Refactor Go module",
+      "⚡ Optimize Go performance"
+    ],
+    ".rs": [
+      "🦀 Update Rust code",
+      "🔧 Refactor Rust module",
+      "⚡ Optimize Rust performance"
+    ],
+    ".java": [
+      "☕ Update Java class",
+      "🔧 Refactor Java code",
+      "🐛 Fix Java bug"
+    ],
+    ".php": [
+      "🐘 Update PHP code",
+      "🔧 Refactor PHP module",
+      "🐛 Fix PHP bug"
+    ],
+    ".rb": [
+      "💎 Update Ruby code",
+      "🔧 Refactor Ruby module",
+      "🐛 Fix Ruby bug"
+    ],
+    ".c": [
+      "🔵 Update C code",
+      "🔧 Fix C implementation",
+      "⚡ Optimize C performance"
+    ],
+    ".cpp": [
+      "🔷 Update C++ code",
+      "🔧 Refactor C++ module",
+      "⚡ Optimize C++ performance"
+    ],
+    ".swift": [
+      "🍎 Update Swift code",
+      "🔧 Fix Swift logic"
+    ],
+    ".kt": [
+      "🟣 Update Kotlin code",
+      "🔧 Fix Kotlin logic"
+    ]
+  },
+  "byFilename": {
+    "package.json": [
+      "📦 Update dependencies",
+      "⬆️ Upgrade packages",
+      "🔧 Modify package config",
+      "➕ Add new dependency"
+    ],
+    "package-lock.json": [
+      "🔒 Update lock file",
+      "📦 Sync dependencies"
+    ],
+    "tsconfig.json": [
+      "🔧 Update TypeScript config",
+      "⚙️ Modify TS compiler options"
+    ],
+    "webpack.config.js": [
+      "📦 Update webpack config",
+      "🔧 Modify build settings"
+    ],
+    "vite.config.js": [
+      "⚡ Update Vite config",
+      "🔧 Modify Vite settings"
+    ],
+    "eslintrc": [
+      "🧹 Update ESLint rules",
+      "🔧 Modify linting config"
+    ],
+    "prettierrc": [
+      "💄 Update Prettier config",
+      "🔧 Modify formatting rules"
+    ],
+    "dockerfile": [
+      "🐳 Update Dockerfile",
+      "📦 Modify container setup"
+    ],
+    "docker-compose.yml": [
+      "🐳 Update Docker Compose",
+      "🔧 Modify services config"
+    ],
+    "makefile": [
+      "🔨 Update Makefile",
+      "🔧 Modify build targets"
+    ],
+    "requirements.txt": [
+      "📦 Update Python dependencies",
+      "⬆️ Upgrade Python packages"
+    ],
+    "gemfile": [
+      "💎 Update Ruby gems",
+      "📦 Modify Gemfile"
+    ],
+    "cargo.toml": [
+      "🦀 Update Rust dependencies",
+      "📦 Modify Cargo config"
+    ],
+    "go.mod": [
+      "🐹 Update Go modules",
+      "📦 Modify Go dependencies"
+    ]
+  },
+  "byPath": {
+    "test": [
+      "✅ Update tests",
+      "🧪 Add test cases",
+      "🐛 Fix failing tests",
+      "✅ Improve test coverage"
+    ],
+    "spec": [
+      "✅ Update specs",
+      "🧪 Add spec cases",
+      "🐛 Fix failing specs"
+    ],
+    "__tests__": [
+      "✅ Update Jest tests",
+      "🧪 Add test cases"
+    ],
+    "components": [
+      "🧩 Update component",
+      "✨ Improve component logic",
+      "🎨 Enhance component UI"
+    ],
+    "utils": [
+      "🔧 Update utility function",
+      "⚡ Optimize helper code"
+    ],
+    "helpers": [
+      "🔧 Update helper function",
+      "✨ Add new helper"
+    ],
+    "services": [
+      "🔌 Update service layer",
+      "🔧 Fix service logic"
+    ],
+    "api": [
+      "🌐 Update API endpoint",
+      "🔧 Fix API logic",
+      "✨ Add API feature"
+    ],
+    "routes": [
+      "🛤️ Update routes",
+      "🔧 Fix routing logic"
+    ],
+    "middleware": [
+      "🔗 Update middleware",
+      "🔧 Fix middleware logic"
+    ],
+    "models": [
+      "🗃️ Update data model",
+      "🔧 Fix model schema"
+    ],
+    "controllers": [
+      "🎮 Update controller",
+      "🔧 Fix controller logic"
+    ],
+    "views": [
+      "👁️ Update view layer",
+      "🎨 Improve view template"
+    ],
+    "hooks": [
+      "🪝 Update custom hook",
+      "✨ Add new hook"
+    ],
+    "store": [
+      "🏪 Update state store",
+      "🔧 Fix store logic"
+    ],
+    "redux": [
+      "🔄 Update Redux logic",
+      "🔧 Fix reducer/action"
+    ],
+    "config": [
+      "⚙️ Update configuration",
+      "🔧 Modify settings"
+    ],
+    "scripts": [
+      "📜 Update script",
+      "🔧 Fix script logic"
+    ],
+    "migrations": [
+      "🗃️ Add migration",
+      "🔧 Update migration"
+    ],
+    "seeds": [
+      "🌱 Update seed data",
+      "📝 Add seed records"
+    ],
+    "assets": [
+      "🖼️ Update assets",
+      "📦 Add new asset"
+    ],
+    "public": [
+      "🌐 Update public files",
+      "📦 Add public asset"
+    ],
+    "dist": [
+      "📦 Update build output",
+      "🔧 Fix dist files"
+    ],
+    "src": [
+      "✨ Update source code",
+      "🔧 Fix source file"
+    ],
+    "lib": [
+      "📚 Update library code",
+      "🔧 Fix lib module"
+    ],
+    "docs": [
+      "📝 Update documentation",
+      "📚 Improve docs"
+    ]
+  },
+  "generic": [
+    "✨ Update code",
+    "🔧 Minor changes",
+    "📝 Small update",
+    "🔨 Work in progress",
+    "💡 Improve implementation",
+    "🧹 Code cleanup",
+    "⚡ Quick fix",
+    "🎯 Targeted update",
+    "🔄 Iterative changes",
+    "💪 Progress update"
+  ],
+  "multiFile": [
+    "✨ Update multiple files",
+    "🔧 Refactor codebase",
+    "📦 Batch updates",
+    "🔄 Sync changes across files",
+    "🎨 Improve code structure"
+  ]
+}
