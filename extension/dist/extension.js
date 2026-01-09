@@ -289,8 +289,8 @@ function activate(context) {
             const generate = config.get('ai.generateCommitMessage', true);
             const provider = config.get('ai.provider', 'deepseek');
             let deepseekKey = config.get('ai.apiKey', '') || config.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
-            // Use Google Gemini 2.0 Flash - fast, accurate, and FREE
-            const deepseekModel = config.get('ai.deepseekModel', 'google/gemini-2.0-flash-exp:free');
+            // Use DeepSeek Chat - very cheap ($0.07/M tokens), fast, no aggressive rate limits
+            const deepseekModel = config.get('ai.deepseekModel', 'deepseek/deepseek-chat');
             
             out.appendLine(`git-autopush: AI config - enabled=${aiEnabled}, generate=${generate}, provider=${provider}, hasKey=${!!deepseekKey}, keyLen=${deepseekKey?.length || 0}, model=${deepseekModel}`);
             
