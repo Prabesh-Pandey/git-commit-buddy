@@ -46,7 +46,7 @@ function createUIManager({ getStats, outputChannel }) {
             }
 
             if (showStats && stats.streak > 0) {
-                text += ` 🔥${stats.streak}`;
+                text += ` 🔥${stats.streak}d`;
             }
 
             statusBar.text = text;
@@ -55,13 +55,13 @@ function createUIManager({ getStats, outputChannel }) {
             const tooltipLines = [
                 `**Git AutoPush** $(git-commit)`,
                 `---`,
-                `Auto Commit: ${autoCommit ? '✅ On' : '❌ Off'}`,
-                `Auto Push: ${autoPush ? '✅ On' : '❌ Off'}`,
-                `Dry Run: ${dryRun ? '🧪 Yes' : '🚀 No'}`,
+                `Auto Commit: ${autoCommit ? '✅ On' : '○ Off'}`,
+                `Auto Push: ${autoPush ? '✅ On' : '○ Off'}`,
+                `Dry Run: ${dryRun ? '⚠️ Yes' : '✓ No'}`,
                 `---`,
-                `📊 **Stats**`,
-                `Total: ${stats.totalCommits} | Today: ${stats.todayCommits}`,
-                `Streak: ${stats.streak} 🔥 | Best: ${stats.longestStreak}`,
+                `**📊 Statistics**`,
+                `Total: ${stats.totalCommits} │ Today: ${stats.todayCommits}`,
+                `🔥 Streak: ${stats.streak}d │ ⭐ Best: ${stats.longestStreak}d`,
                 `---`,
                 `*Click for quick actions*`
             ];
@@ -87,7 +87,7 @@ function createUIManager({ getStats, outputChannel }) {
      */
     function showStatsPanel(stats, achievements) {
         const earned = achievements.filter(a => a.earned).map(a => a.name);
-        const locked = achievements.filter(a => !a.earned).map(a => `🔒 ${a.name}`);
+        const locked = achievements.filter(a => !a.earned).map(a => a.name.replace(/^./, '🔒'));
 
         const panel = vscode.window.createWebviewPanel(
             'gitAutopushStats',
@@ -99,32 +99,90 @@ function createUIManager({ getStats, outputChannel }) {
         panel.webview.html = `<!DOCTYPE html>
 <html><head><style>
 body { 
-    font-family: var(--vscode-font-family); 
-    padding: 20px; 
-    background: var(--vscode-editor-background); 
-    color: var(--vscode-editor-foreground); 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 30px; 
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #eee;
+    min-height: 100vh;
 }
-.stat { font-size: 48px; text-align: center; margin: 20px 0; }
-.label { font-size: 14px; color: var(--vscode-descriptionForeground); text-align: center; }
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 30px 0; }
-.card { 
-    background: var(--vscode-input-background); 
-    padding: 20px; 
-    border-radius: 8px; 
+h1 { 
+    font-size: 28px; 
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.stat { 
+    font-size: 52px; 
+    font-weight: 700;
     text-align: center; 
+    margin: 15px 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.label { 
+    font-size: 13px; 
+    color: #888; 
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 20px; 
+    margin: 30px 0; 
+}
+.card { 
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    padding: 25px; 
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+.today-card {
+    background: linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%);
+    border: 1px solid rgba(102,126,234,0.3);
 }
 .badge { 
     display: inline-block; 
-    padding: 5px 10px; 
-    margin: 5px; 
-    border-radius: 15px; 
-    background: var(--vscode-badge-background); 
+    padding: 8px 16px; 
+    margin: 6px; 
+    border-radius: 20px;
+    background: rgba(255,255,255,0.1);
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.1);
 }
-.locked { opacity: 0.5; }
-h2 { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; }
+.badge.earned {
+    background: linear-gradient(135deg, rgba(102,126,234,0.3) 0%, rgba(118,75,162,0.3) 100%);
+    border: 1px solid rgba(102,126,234,0.5);
+}
+.locked { 
+    opacity: 0.4;
+    filter: grayscale(100%);
+}
+.achievements { margin-top: 40px; }
+h2 { 
+    font-size: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.progress-text {
+    font-size: 14px;
+    color: #888;
+    margin-left: auto;
+}
 </style></head>
 <body>
-<h1>📊 Your Git AutoPush Stats</h1>
+<h1>📊 Git AutoPush Stats</h1>
 <div class="grid">
     <div class="card">
         <div class="stat">${stats.totalCommits}</div>
@@ -132,21 +190,21 @@ h2 { border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 10px; 
     </div>
     <div class="card">
         <div class="stat">🔥 ${stats.streak}</div>
-        <div class="label">Current Streak</div>
+        <div class="label">Day Streak</div>
     </div>
     <div class="card">
         <div class="stat">⭐ ${stats.longestStreak}</div>
-        <div class="label">Longest Streak</div>
+        <div class="label">Best Streak</div>
     </div>
 </div>
-<div class="card">
+<div class="card today-card">
     <div class="stat">${stats.todayCommits}</div>
     <div class="label">Commits Today</div>
 </div>
 <div class="achievements">
-    <h2>🏆 Achievements (${earned.length}/${achievements.length})</h2>
+    <h2>🏆 Achievements <span class="progress-text">${earned.length} of ${achievements.length} unlocked</span></h2>
     <div>
-        ${earned.map(a => `<span class="badge">${a}</span>`).join('')}
+        ${earned.map(a => `<span class="badge earned">${a}</span>`).join('')}
         ${locked.map(a => `<span class="badge locked">${a}</span>`).join('')}
     </div>
 </div>

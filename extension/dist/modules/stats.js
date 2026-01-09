@@ -17,16 +17,16 @@ const DEFAULT_STATS = {
     achievements: []
 };
 
-// Achievement definitions
+// Achievement definitions - Rewarding icons
 const ACHIEVEMENTS = [
-    { id: 'first_commit', name: '🎉 First Commit!', condition: (s) => s.totalCommits >= 1 },
-    { id: 'ten_commits', name: '🔟 Ten Commits!', condition: (s) => s.totalCommits >= 10 },
-    { id: 'fifty_commits', name: '🎯 50 Commits!', condition: (s) => s.totalCommits >= 50 },
-    { id: 'hundred_commits', name: '💯 100 Commits!', condition: (s) => s.totalCommits >= 100 },
-    { id: 'streak_3', name: '🔥 3 Day Streak!', condition: (s) => s.streak >= 3 },
-    { id: 'streak_7', name: '🌟 Week Warrior!', condition: (s) => s.streak >= 7 },
-    { id: 'streak_30', name: '👑 Monthly Master!', condition: (s) => s.streak >= 30 },
-    { id: 'productive_day', name: '⚡ Super Productive!', condition: (s) => s.todayCommits >= 10 },
+    { id: 'first_commit', name: '🥉 First Commit', condition: (s) => s.totalCommits >= 1 },
+    { id: 'ten_commits', name: '🥈 10 Commits', condition: (s) => s.totalCommits >= 10 },
+    { id: 'fifty_commits', name: '🥇 50 Commits', condition: (s) => s.totalCommits >= 50 },
+    { id: 'hundred_commits', name: '🏆 Century Club', condition: (s) => s.totalCommits >= 100 },
+    { id: 'streak_3', name: '🔥 3-Day Streak', condition: (s) => s.streak >= 3 },
+    { id: 'streak_7', name: '⭐ Week Warrior', condition: (s) => s.streak >= 7 },
+    { id: 'streak_30', name: '👑 Monthly Master', condition: (s) => s.streak >= 30 },
+    { id: 'productive_day', name: '⚡ Productive Day', condition: (s) => s.todayCommits >= 10 },
 ];
 
 /**
@@ -59,7 +59,7 @@ function createStatsManager(context) {
         for (const ach of ACHIEVEMENTS) {
             if (!stats.achievements.includes(ach.id) && ach.condition(stats)) {
                 stats.achievements.push(ach.id);
-                vscode.window.showInformationMessage(`🏆 Achievement Unlocked: ${ach.name}`);
+                vscode.window.showInformationMessage(`Achievement Unlocked: ${ach.name}`);
             }
         }
     }

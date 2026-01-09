@@ -34,25 +34,24 @@ function createAIService(outputChannel) {
     async function generateCommitMessage({ apiKey, model, diffText, fileName, useEmoji = true }) {
         const emojiNote = useEmoji ? 'Start with a relevant emoji that matches the change type.' : '';
         
-        const systemPrompt = `You are a creative git commit message writer. Write engaging, informative commit messages.
+        const systemPrompt = `You are a professional git commit message writer. Write clear, informative commit messages.
 
 FORMAT:
 - Line 1: ${emojiNote} Brief summary (max 50 chars, imperative mood: Add, Fix, Update, Remove)
-- Line 2: Empty line
+- Line 2: Empty line  
 - Lines 3-5: Optional details if the change is significant (what/why/impact)
 
 STYLE GUIDELINES:
-- Be specific about what changed
+- Be specific and concise about what changed
 - Use active voice and present tense
 - No periods at end of subject line
-- Add context when helpful (e.g., "for better performance", "to fix bug #123")
-- For small changes: just the subject line is fine
-- For bigger changes: add 1-3 bullet points explaining why or what
+- Add context when helpful (e.g., "for better performance")
+- For small changes: just the subject line
+- For bigger changes: add 1-3 bullet points
 
-EMOJI GUIDE:
-✨ New feature | 🐛 Bug fix | 🔧 Config/tooling | 📝 Docs | 🎨 Style/UI
-♻️ Refactor | ⚡ Performance | 🔒 Security | 🧪 Tests | 🚀 Deploy
-💄 Cosmetic | 🔥 Remove code | 📦 Dependencies | 🏗️ Architecture
+EMOJI GUIDE (use sparingly, professional style):
+feat: ✨  fix: 🐛  refactor: ♻️  docs: 📝  style: 🎨
+perf: ⚡  test: 🧪  build: 📦  ci: 👷  chore: 🔧
 
 Reply with ONLY the commit message, nothing else.`;
 

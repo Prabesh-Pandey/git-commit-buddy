@@ -249,8 +249,8 @@ async function handleSave(doc, deps) {
             if (!apiKey) {
                 out.appendLine('git-autopush: No API key, prompting...');
                 const entered = await vscode.window.showInputBox({
-                    prompt: '🔑 Enter your OpenRouter API key (get free at openrouter.ai/keys)',
-                    placeHolder: 'sk-or-v1-xxxxxxxxxxxx',
+                    prompt: 'Enter your OpenRouter API key',
+                    placeHolder: 'sk-or-v1-...',
                     ignoreFocusOut: true,
                     password: true,
                     validateInput: (v) => aiService.validateApiKey(v)
@@ -259,7 +259,7 @@ async function handleSave(doc, deps) {
                 if (entered && entered.trim()) {
                     await config.update('ai.apiKey', entered.trim(), vscode.ConfigurationTarget.Global);
                     apiKey = entered.trim();
-                    vscode.window.showInformationMessage('✅ API key saved!');
+                    vscode.window.showInformationMessage('API key saved successfully');
                 }
             }
 
@@ -269,7 +269,7 @@ async function handleSave(doc, deps) {
 
                 await vscode.window.withProgress({
                     location: vscode.ProgressLocation.Notification,
-                    title: "🤖 Generating commit message...",
+                    title: "Generating commit message...",
                     cancellable: false
                 }, async () => {
                     try {
@@ -332,7 +332,7 @@ async function handleSave(doc, deps) {
 
         const action = canPush ? 'Committed & pushed' : 'Committed';
         vscode.window.showInformationMessage(
-            `$(git-commit) ${action}! (${stats.todayCommits} today, 🔥${stats.streak})`,
+            `$(git-commit) ${action} · ${stats.todayCommits} today · ${stats.streak}d streak`,
             'View Log'
         ).then(sel => { if (sel === 'View Log') out.show(); });
     } else {

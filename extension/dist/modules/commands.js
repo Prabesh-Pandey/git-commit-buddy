@@ -47,20 +47,20 @@ function registerCommands(deps) {
         const hasKey = apiKey && apiKey.length > 10;
 
         const items = [
-            { label: `$(git-commit) Auto Commit: ${autoCommit ? 'ON ✅' : 'OFF'}`, description: 'Toggle auto commits', action: 'toggleCommit' },
-            { label: `$(cloud-upload) Auto Push: ${autoPush ? 'ON ✅' : 'OFF'}`, description: 'Toggle auto push', action: 'togglePush' },
-            { label: `$(beaker) Dry Run: ${dryRun ? 'ON 🧪' : 'OFF'}`, description: 'Toggle dry run mode', action: 'toggleDry' },
+            { label: `$(git-commit) Auto Commit: ${autoCommit ? 'On ●' : 'Off ○'}`, description: 'Toggle auto commits', action: 'toggleCommit' },
+            { label: `$(cloud-upload) Auto Push: ${autoPush ? 'On ●' : 'Off ○'}`, description: 'Toggle auto push', action: 'togglePush' },
+            { label: `$(beaker) Dry Run: ${dryRun ? 'On ◈' : 'Off ◇'}`, description: 'Toggle dry run mode', action: 'toggleDry' },
             { label: '', kind: vscode.QuickPickItemKind.Separator },
-            { label: '$(play) Run Once Now', description: 'Commit now', action: 'runOnce' },
+            { label: '$(play) Run Once Now', description: 'Execute commit now', action: 'runOnce' },
             { label: '$(discard) Undo Last Commit', description: state.lastCommitInfo ? `Undo: ${state.lastCommitInfo.message.slice(0,30)}...` : 'No commit to undo', action: 'undo' },
             { label: '', kind: vscode.QuickPickItemKind.Separator },
-            { label: '$(graph) View Stats', description: `${stats.totalCommits} commits, ${stats.streak} day streak`, action: 'stats' },
-            { label: '$(history) Commit History', description: 'Recent commits', action: 'history' },
-            { label: `$(key) API Key: ${hasKey ? '✅ Set' : '❌ Missing'}`, description: hasKey ? 'Key configured' : 'Click to add key', action: 'apiKey' },
-            { label: '$(output) View Debug Log', description: 'Open debug output', action: 'log' },
+            { label: '$(graph) View Statistics', description: `${stats.totalCommits} commits · ${stats.streak}d streak`, action: 'stats' },
+            { label: '$(history) Commit History', description: 'View recent commits', action: 'history' },
+            { label: `$(key) API Key: ${hasKey ? 'Configured ●' : 'Missing ○'}`, description: hasKey ? 'OpenRouter key set' : 'Click to configure', action: 'apiKey' },
+            { label: '$(terminal) Debug Output', description: 'View extension logs', action: 'log' },
         ];
 
-        const selected = await vscode.window.showQuickPick(items, { placeHolder: '🚀 Git AutoPush - Quick Actions' });
+        const selected = await vscode.window.showQuickPick(items, { placeHolder: 'Git AutoPush · Quick Actions' });
         if (!selected) return;
 
         switch (selected.action) {
@@ -180,23 +180,23 @@ function registerCommands(deps) {
 
     const setApiKeyCmd = vscode.commands.registerCommand('git-autopush.setApiKey', async () => {
         const action = await vscode.window.showInformationMessage(
-            '🔑 You need an OpenRouter API key (free)',
-            'Get Free Key',
-            'I have a key'
+            'OpenRouter API key required (free tier available)',
+            'Get API Key',
+            'Enter Key'
         );
 
-        if (action === 'Get Free Key') {
+        if (action === 'Get API Key') {
             vscode.env.openExternal(vscode.Uri.parse('https://openrouter.ai/keys'));
-            vscode.window.showInformationMessage('After getting your key, run this command again to enter it');
+            vscode.window.showInformationMessage('Get your key from OpenRouter, then run this command again');
             return;
         }
 
-        if (action !== 'I have a key') return;
+        if (action !== 'Enter Key') return;
 
         try {
             const value = await vscode.window.showInputBox({
-                prompt: 'Paste your OpenRouter API key here',
-                placeHolder: 'sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx',
+                prompt: 'Enter your OpenRouter API key',
+                placeHolder: 'sk-or-v1-...',
                 ignoreFocusOut: true,
                 password: true,
                 validateInput: (v) => aiService.validateApiKey(v)
@@ -205,7 +205,7 @@ function registerCommands(deps) {
             if (typeof value === 'string' && value.trim()) {
                 await vscode.workspace.getConfiguration('gitAutopush')
                     .update('ai.apiKey', value.trim(), vscode.ConfigurationTarget.Global);
-                vscode.window.showInformationMessage('✅ API key saved! Now press Ctrl+S to test.');
+                vscode.window.showInformationMessage('API key saved successfully');
                 out.appendLine('git-autopush: API key saved to user settings');
             }
         } catch (e) {
