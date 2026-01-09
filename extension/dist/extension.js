@@ -28,7 +28,7 @@ const { createAIService } = require("./modules/ai-service");
 const { createGitOperations } = require("./modules/git-operations");
 const { createUIManager } = require("./modules/ui");
 const { registerCommands } = require("./modules/commands");
-const { getSmartMessageWithFile } = require("./modules/message-picker");
+const { getSmartMessageWithFile, stripEmoji } = require("./modules/message-picker");
 
 /**
  * Extension activation
@@ -285,13 +285,18 @@ async function handleSave(doc, deps) {
                         }
 
                         // Generate message via AI
-                        const generated = await aiService.generateCommitMessage({
+                        let generated = await aiService.generateCommitMessage({
                             apiKey,
                             model,
                             diffText,
                             fileName: rel,
                             useEmoji
                         });
+
+                        // Force strip emoji if setting is off (AI doesn't always follow instructions)
+                        if (generated && !useEmoji) {
+                            generated = stripEmoji(generated);
+                        }
 
                         message = generated || message;
                         out.appendLine(`git-autopush: using: ${message}`);

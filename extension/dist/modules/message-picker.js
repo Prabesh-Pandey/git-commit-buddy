@@ -136,5 +136,6 @@ function getSmartMessageWithFile(filePath, options = {}) {
 module.exports = {
     getSmartMessage,
     getSmartMessageWithFile,
-    loadMessages
+    loadMessages,
+    stripEmoji
 };
