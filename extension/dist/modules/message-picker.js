@@ -49,6 +49,23 @@ function pickRandom(arr) {
 }
 
 /**
+ * Remove emoji from the start of a string
+ * @param {string} str
+ * @returns {string}
+ */
+function stripEmoji(str) {
+    if (!str) return str;
+    // Remove emojis and special symbols from the start
+    // This handles Unicode emojis, symbols, and pictographs
+    return str
+        .replace(/^[\u{1F300}-\u{1F9FF}]+ */gu, '')  // Emojis
+        .replace(/^[\u{2600}-\u{26FF}]+ */gu, '')    // Misc symbols
+        .replace(/^[\u{2700}-\u{27BF}]+ */gu, '')    // Dingbats
+        .replace(/^[^\p{L}\p{N}]+ */gu, '')          // Any non-letter/number at start
+        .trim();
+}
+
+/**
  * Generate a contextual commit message based on file info
  * @param {string} filePath - Full path to the file
  * @param {object} options - Options
@@ -63,7 +80,7 @@ function getSmartMessage(filePath, options = {}) {
     // For multiple files
     if (isMultiFile) {
         let msg = pickRandom(messages.multiFile) || "✨ Update multiple files";
-        return useEmoji ? msg : msg.replace(/^[^\w\s]+\s*/, '');
+        return useEmoji ? msg : stripEmoji(msg);
     }
     
     const fileName = path.basename(filePath).toLowerCase();
@@ -74,7 +91,7 @@ function getSmartMessage(filePath, options = {}) {
     for (const [name, msgList] of Object.entries(messages.byFilename || {})) {
         if (fileName === name.toLowerCase() || fileName.includes(name.toLowerCase())) {
             let msg = pickRandom(msgList);
-            if (msg) return useEmoji ? msg : msg.replace(/^[^\w\s]+\s*/, '');
+            if (msg) return useEmoji ? msg : stripEmoji(msg);
         }
     }
     
@@ -82,7 +99,7 @@ function getSmartMessage(filePath, options = {}) {
     for (const [pathKey, msgList] of Object.entries(messages.byPath || {})) {
         if (dirPath.includes(`/${pathKey}/`) || dirPath.includes(`\\${pathKey}\\`)) {
             let msg = pickRandom(msgList);
-            if (msg) return useEmoji ? msg : msg.replace(/^[^\w\s]+\s*/, '');
+            if (msg) return useEmoji ? msg : stripEmoji(msg);
         }
     }
     
@@ -90,12 +107,12 @@ function getSmartMessage(filePath, options = {}) {
     const extMessages = messages.byExtension?.[ext];
     if (extMessages && extMessages.length > 0) {
         let msg = pickRandom(extMessages);
-        if (msg) return useEmoji ? msg : msg.replace(/^[^\w\s]+\s*/, '');
+        if (msg) return useEmoji ? msg : stripEmoji(msg);
     }
     
     // 4. Fall back to generic messages
-    let msg = pickRandom(messages.generic) || "✨ Update code";
-    return useEmoji ? msg : msg.replace(/^[^\w\s]+\s*/, '');
+    let msg = pickRandom(messages.generic) || "Update code";
+    return useEmoji ? msg : stripEmoji(msg);
 }
 
 /**
