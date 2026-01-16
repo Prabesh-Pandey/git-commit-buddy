@@ -1,4 +1,4 @@
-# 🚀 Git AutoPush On Save (with AI Commit Messages)
+# Git AutoPush On Save (with AI Commit Messages)
 
 A VS Code extension for solo developers and small teams that automatically commits (and optionally pushes) your code on save, with smart, professional commit messages powered by AI or customizable templates.
 
