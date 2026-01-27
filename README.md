@@ -40,15 +40,37 @@ All options are available in VS Code settings (search for "Git Autopush"):
 - **Protected Branches**: Never push to these branches
 - **Sensitive File Globs**: Never commit secrets or sensitive files
 - **AI Model**: Choose your OpenRouter model (e.g., `deepseek/deepseek-chat`)
+- **Commit Style**: Choose `auto` (intelligent), `concise`, or `detailed`
+- **Conventional Commits**: Toggle conventional commit format (feat:, fix:, etc.)
+- **Include Scope**: Auto-detect and include scope (e.g., `feat(auth): ...`)
 
 ---
 
 ## Commit Message Logic
 
-- **AI First**: If enabled and API key is set, generates a detailed, conventional commit message using your code diff and file context.
-- **Smart Fallback**: If AI fails or is disabled, picks a contextual message from a large JSON template set (by extension, filename, folder, or generic).
-- **Emoji Respect**: Honors the "Use Emoji" setting for both AI and fallback messages.
-- **Force Stripping**: If AI returns emojis when disabled, they are stripped automatically.
+### 🧠 Intelligent Context-Aware Messages (NEW!)
+
+The AI now analyzes your changes to generate the perfect commit message:
+
+| Change Size          | Message Style                                  |
+| -------------------- | ---------------------------------------------- |
+| 1-5 lines (typo fix) | Short one-liner: `fix: correct typo in button` |
+| 6-50 lines (feature) | Subject + brief body with bullet points        |
+| 50+ lines (refactor) | Detailed message with full context             |
+
+### Features
+
+- **Smart Complexity Detection**: Analyzes diff size, file changes, and patterns
+- **Change Type Detection**: Automatically identifies feat/fix/refactor/docs/test
+- **Scope Extraction**: Detects scope from file paths (auth, api, components, etc.)
+- **Breaking Change Alerts**: Warns about breaking changes in commits
+- **Conventional Commits**: Follows the conventional commit specification
+
+### Modes
+
+- **Auto (Default)**: AI intelligently picks the right message length
+- **Concise**: Always short, single-line messages
+- **Detailed**: Always includes body with bullet points
 
 ---
 

@@ -8,9 +8,22 @@
     "url": "https://github.com/local/git-autopush-on-save.git"
   },
   "version": "1.0.0",
-  "engines": {"vscode": "^1.60.0"},
-  "categories": ["Other", "SCM Providers"],
-  "keywords": ["git", "commit", "autopush", "ai", "deepseek", "productivity", "automation"],
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "commit",
+    "autopush",
+    "ai",
+    "deepseek",
+    "productivity",
+    "automation"
+  ],
   "contributes": {
     "commands": [
       {
@@ -94,20 +107,38 @@
         },
         "gitAutopush.watchGlobs": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["**/*.{py,js,ts,md,json,txt,jsx,tsx,css,html}"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/*.{py,js,ts,md,json,txt,jsx,tsx,css,html}"
+          ],
           "description": "Glob patterns of files to watch for saves."
         },
         "gitAutopush.protectedBranches": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["main", "master", "production"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "main",
+            "master",
+            "production"
+          ],
           "description": "Branches where auto-push is disabled by default."
         },
         "gitAutopush.sensitiveFileGlobs": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": [".env", "*.key", "credentials.json", "*.pem", "*.secret"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".env",
+            "*.key",
+            "credentials.json",
+            "*.pem",
+            "*.secret"
+          ],
           "description": "File globs that must never be auto-committed."
         },
         "gitAutopush.useEmoji": {
@@ -128,7 +159,9 @@
         "gitAutopush.ai.provider": {
           "type": "string",
           "default": "deepseek",
-          "enum": ["deepseek"],
+          "enum": [
+            "deepseek"
+          ],
           "description": "AI provider for commit messages."
         },
         "gitAutopush.ai.apiKey": {
@@ -158,6 +191,31 @@
           "type": "boolean",
           "default": true,
           "description": "Review AI message before committing."
+        },
+        "gitAutopush.ai.commitStyle": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "concise",
+            "detailed"
+          ],
+          "enumDescriptions": [
+            "Intelligent: Adapts message length to change complexity",
+            "Concise: Always short, single-line messages",
+            "Detailed: Always include body with bullet points"
+          ],
+          "description": "Commit message style. 'auto' intelligently adapts based on change size."
+        },
+        "gitAutopush.ai.conventionalCommits": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use conventional commit format (feat:, fix:, refactor:, etc.)"
+        },
+        "gitAutopush.ai.includeScope": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include scope in commit messages when detected (e.g., feat(auth): ...)"
         }
       }
     }

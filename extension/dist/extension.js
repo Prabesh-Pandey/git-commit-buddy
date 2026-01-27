@@ -284,13 +284,20 @@ async function handleSave(doc, deps) {
                             diffText = doc.getText().slice(0, 2000);
                         }
 
-                        // Generate message via AI
+                        // Generate message via AI with intelligent context
+                        const commitStyle = config.get('ai.commitStyle', 'auto');
+                        const conventionalCommits = config.get('ai.conventionalCommits', true);
+                        const includeScope = config.get('ai.includeScope', true);
+
                         let generated = await aiService.generateCommitMessage({
                             apiKey,
                             model,
                             diffText,
                             fileName: rel,
-                            useEmoji
+                            useEmoji,
+                            commitStyle,
+                            conventionalCommits,
+                            includeScope
                         });
 
                         // Force strip emoji if setting is off (AI doesn't always follow instructions)
