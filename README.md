@@ -74,6 +74,26 @@ The AI now analyzes your changes to generate the perfect commit message:
 
 ---
 
+## PR Description Generation
+
+Generate AI-powered Pull Request descriptions from your commit history:
+
+1. Run command: `Git AutoPush: Generate PR Description`
+2. Select base branch (main, master, develop)
+3. AI analyzes all commits and generates:
+   - PR title
+   - Summary paragraph
+   - Grouped changes by type
+   - Files changed
+   - Testing notes
+
+**Commands:**
+
+- `Git AutoPush: Generate PR Description` - Opens preview in editor
+- `Git AutoPush: Copy PR Description to Clipboard` - Quick copy
+
+---
+
 ## Achievements & Stats
 
 - **Achievements**: Earn badges for first commit, streaks, and productivity milestones.

@@ -323,6 +323,155 @@ function registerCommands(deps) {
         await vscode.commands.executeCommand('workbench.action.files.save');
     });
     context.subscriptions.push(saveAndRunCmd);
+
+    // =========================================================================
+    // PR GENERATION COMMANDS
+    // =========================================================================
+
+    const { createPRGenerator } = require('./pr-generator');
+    const prGenerator = createPRGenerator(outputChannel);
+
+    const generatePRCmd = vscode.commands.registerCommand('git-autopush.generatePR', async () => {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceFolder) {
+            vscode.window.showWarningMessage('No workspace folder open');
+            return;
+        }
+
+        const repoRoot = gitOps.getRepoRoot(workspaceFolder);
+        if (!repoRoot) {
+            vscode.window.showWarningMessage('Not a git repository');
+            return;
+        }
+
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const defaultBaseBranch = cfg.get('pr.baseBranch', 'main');
+        const apiKey = cfg.get('ai.apiKey', '') || cfg.get('ai.deepseekApiKey', '');
+        const model = cfg.get('ai.deepseekModel', 'deepseek/deepseek-chat');
+        const useEmoji = cfg.get('useEmoji', true);
+
+        if (!apiKey) {
+            const action = await vscode.window.showWarningMessage(
+                'API key required for AI-generated PR descriptions',
+                'Set API Key',
+                'Generate Basic'
+            );
+            if (action === 'Set API Key') {
+                vscode.commands.executeCommand('git-autopush.setApiKey');
+                return;
+            }
+            if (!action) return;
+        }
+
+        // Let user select base branch
+        const baseBranch = await vscode.window.showInputBox({
+            prompt: 'Enter base branch to compare against',
+            value: defaultBaseBranch,
+            placeHolder: 'main, master, develop...'
+        });
+
+        if (!baseBranch) return;
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating PR description...",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ message: 'Analyzing commits...' });
+
+            try {
+                const result = await prGenerator.generatePRDescription(aiService, {
+                    repoRoot,
+                    baseBranch,
+                    apiKey,
+                    model,
+                    useEmoji
+                });
+
+                if (result.error && !result.description) {
+                    vscode.window.showErrorMessage(`PR generation failed: ${result.error}`);
+                    return;
+                }
+
+                // Show result in a new document
+                const content = result.title 
+                    ? `# ${result.title}\n\n${result.description}`
+                    : result.description;
+
+                const doc = await vscode.workspace.openTextDocument({
+                    content,
+                    language: 'markdown'
+                });
+                await vscode.window.showTextDocument(doc, { preview: true });
+
+                // Offer to copy to clipboard
+                const action = await vscode.window.showInformationMessage(
+                    'PR description generated!',
+                    'Copy to Clipboard',
+                    'Close'
+                );
+
+                if (action === 'Copy to Clipboard') {
+                    await vscode.env.clipboard.writeText(content);
+                    vscode.window.showInformationMessage('PR description copied to clipboard');
+                }
+
+            } catch (e) {
+                out.appendLine(`git-autopush: PR generation error: ${e.message}`);
+                vscode.window.showErrorMessage(`PR generation failed: ${e.message}`);
+            }
+        });
+    });
+    context.subscriptions.push(generatePRCmd);
+
+    const copyPRCmd = vscode.commands.registerCommand('git-autopush.copyPRToClipboard', async () => {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceFolder) {
+            vscode.window.showWarningMessage('No workspace folder open');
+            return;
+        }
+
+        const repoRoot = gitOps.getRepoRoot(workspaceFolder);
+        if (!repoRoot) {
+            vscode.window.showWarningMessage('Not a git repository');
+            return;
+        }
+
+        const cfg = vscode.workspace.getConfiguration('gitAutopush');
+        const baseBranch = cfg.get('pr.baseBranch', 'main');
+        const apiKey = cfg.get('ai.apiKey', '') || cfg.get('ai.deepseekApiKey', '');
+        const model = cfg.get('ai.deepseekModel', 'deepseek/deepseek-chat');
+        const useEmoji = cfg.get('useEmoji', true);
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating PR description...",
+            cancellable: false
+        }, async () => {
+            try {
+                const result = await prGenerator.generatePRDescription(aiService, {
+                    repoRoot,
+                    baseBranch,
+                    apiKey,
+                    model,
+                    useEmoji
+                });
+
+                const content = result.title 
+                    ? `# ${result.title}\n\n${result.description}`
+                    : result.description;
+
+                await vscode.env.clipboard.writeText(content);
+                vscode.window.showInformationMessage('PR description copied to clipboard!');
+
+            } catch (e) {
+                out.appendLine(`git-autopush: PR copy error: ${e.message}`);
+                vscode.window.showErrorMessage(`Failed: ${e.message}`);
+            }
+        });
+    });
+    context.subscriptions.push(copyPRCmd);
 }
 
 module.exports = { registerCommands };
+

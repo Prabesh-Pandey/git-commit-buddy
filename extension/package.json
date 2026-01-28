@@ -73,6 +73,14 @@
       {
         "command": "git-autopush.undoLastCommit",
         "title": "Git AutoPush: Undo Last Commit"
+      },
+      {
+        "command": "git-autopush.generatePR",
+        "title": "Git AutoPush: Generate PR Description"
+      },
+      {
+        "command": "git-autopush.copyPRToClipboard",
+        "title": "Git AutoPush: Copy PR Description to Clipboard"
       }
     ],
     "keybindings": [
@@ -216,6 +224,16 @@
           "type": "boolean",
           "default": true,
           "description": "Include scope in commit messages when detected (e.g., feat(auth): ...)"
+        },
+        "gitAutopush.pr.baseBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "Default base branch for PR generation (e.g., main, master, develop)"
+        },
+        "gitAutopush.pr.includeFileList": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include list of changed files in generated PR description"
         }
       }
     }
