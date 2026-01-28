@@ -45,22 +45,37 @@ function registerCommands(deps) {
         const stats = statsManager.getStats();
         const apiKey = cfg.get('ai.apiKey', '');
         const hasKey = apiKey && apiKey.length > 10;
+        
+        // Get AI settings for display
+        const commitStyle = cfg.get('ai.commitStyle', 'auto');
+        const conventionalCommits = cfg.get('ai.conventionalCommits', true);
+        const includeScope = cfg.get('ai.includeScope', true);
+        const baseBranch = cfg.get('pr.baseBranch', 'main');
+
+        const styleLabels = { auto: 'Auto', concise: 'Short', detailed: 'Detailed' };
 
         const items = [
-            { label: `$(git-commit) Auto Commit: ${autoCommit ? 'On ●' : 'Off ○'}`, description: 'Toggle auto commits', action: 'toggleCommit' },
-            { label: `$(cloud-upload) Auto Push: ${autoPush ? 'On ●' : 'Off ○'}`, description: 'Toggle auto push', action: 'togglePush' },
-            { label: `$(beaker) Dry Run: ${dryRun ? 'On ◈' : 'Off ◇'}`, description: 'Toggle dry run mode', action: 'toggleDry' },
+            { label: `$(git-commit) Auto Commit: ${autoCommit ? 'On' : 'Off'}`, description: 'Toggle auto commits', action: 'toggleCommit' },
+            { label: `$(cloud-upload) Auto Push: ${autoPush ? 'On' : 'Off'}`, description: 'Toggle auto push', action: 'togglePush' },
+            { label: `$(beaker) Dry Run: ${dryRun ? 'On' : 'Off'}`, description: 'Toggle dry run mode', action: 'toggleDry' },
             { label: '', kind: vscode.QuickPickItemKind.Separator },
             { label: '$(play) Run Once Now', description: 'Execute commit now', action: 'runOnce' },
             { label: '$(discard) Undo Last Commit', description: state.lastCommitInfo ? `Undo: ${state.lastCommitInfo.message.slice(0,30)}...` : 'No commit to undo', action: 'undo' },
             { label: '', kind: vscode.QuickPickItemKind.Separator },
-            { label: '$(graph) View Statistics', description: `${stats.totalCommits} commits · ${stats.streak}d streak`, action: 'stats' },
+            { label: '$(git-pull-request) Generate PR Description', description: `Compare against: ${baseBranch}`, action: 'generatePR' },
+            { label: '$(clippy) Copy PR to Clipboard', description: 'Quick copy PR description', action: 'copyPR' },
+            { label: '', kind: vscode.QuickPickItemKind.Separator },
+            { label: `$(edit) Commit Style: ${styleLabels[commitStyle]}`, description: 'Change message length style', action: 'changeStyle' },
+            { label: `$(list-ordered) Conventional Commits: ${conventionalCommits ? 'On' : 'Off'}`, description: 'Toggle feat:/fix: prefixes', action: 'toggleConventional' },
+            { label: `$(symbol-namespace) Include Scope: ${includeScope ? 'On' : 'Off'}`, description: 'Toggle (auth): (api): in messages', action: 'toggleScope' },
+            { label: '', kind: vscode.QuickPickItemKind.Separator },
+            { label: '$(graph) View Statistics', description: `${stats.totalCommits} commits`, action: 'stats' },
             { label: '$(history) Commit History', description: 'View recent commits', action: 'history' },
-            { label: `$(key) API Key: ${hasKey ? 'Configured ●' : 'Missing ○'}`, description: hasKey ? 'OpenRouter key set' : 'Click to configure', action: 'apiKey' },
+            { label: `$(key) API Key: ${hasKey ? 'Configured' : 'Missing'}`, description: hasKey ? 'OpenRouter key set' : 'Click to configure', action: 'apiKey' },
             { label: '$(terminal) Debug Output', description: 'View extension logs', action: 'log' },
         ];
 
-        const selected = await vscode.window.showQuickPick(items, { placeHolder: 'Git AutoPush · Quick Actions' });
+        const selected = await vscode.window.showQuickPick(items, { placeHolder: 'Git AutoPush - Quick Actions' });
         if (!selected) return;
 
         switch (selected.action) {
@@ -78,6 +93,28 @@ function registerCommands(deps) {
                 break;
             case 'runOnce': vscode.commands.executeCommand('git-autopush.runOnce'); break;
             case 'undo': vscode.commands.executeCommand('git-autopush.undoLastCommit'); break;
+            case 'generatePR': vscode.commands.executeCommand('git-autopush.generatePR'); break;
+            case 'copyPR': vscode.commands.executeCommand('git-autopush.copyPRToClipboard'); break;
+            case 'changeStyle':
+                const styles = [
+                    { label: 'Auto', description: 'AI picks based on change size', value: 'auto' },
+                    { label: 'Concise', description: 'Always short one-liners', value: 'concise' },
+                    { label: 'Detailed', description: 'Always include body with bullets', value: 'detailed' }
+                ];
+                const picked = await vscode.window.showQuickPick(styles, { placeHolder: 'Select commit message style' });
+                if (picked) {
+                    await cfg.update('ai.commitStyle', picked.value, vscode.ConfigurationTarget.Workspace);
+                    vscode.window.showInformationMessage(`Commit Style: ${picked.label}`);
+                }
+                break;
+            case 'toggleConventional':
+                await cfg.update('ai.conventionalCommits', !conventionalCommits, vscode.ConfigurationTarget.Workspace);
+                vscode.window.showInformationMessage(`Conventional Commits: ${!conventionalCommits ? 'ON' : 'OFF'}`);
+                break;
+            case 'toggleScope':
+                await cfg.update('ai.includeScope', !includeScope, vscode.ConfigurationTarget.Workspace);
+                vscode.window.showInformationMessage(`Include Scope: ${!includeScope ? 'ON' : 'OFF'}`);
+                break;
             case 'stats': vscode.commands.executeCommand('git-autopush.showStats'); break;
             case 'history': vscode.commands.executeCommand('git-autopush.showHistory'); break;
             case 'apiKey': vscode.commands.executeCommand('git-autopush.setApiKey'); break;
