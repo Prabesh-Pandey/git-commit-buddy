@@ -205,6 +205,14 @@
     "go.mod": [
       "🐹 Update Go modules",
       "📦 Modify Go dependencies"
+    ],
+    "Pipfile.lock": [
+      "📦 Update Pipfile.lock",
+      "🐍 Sync Python dependencies"
+    ],
+    "yarn.lock": [
+      "🔒 Update yarn.lock",
+      "📦 Sync yarn dependencies"
     ]
   },
   "byPath": {
