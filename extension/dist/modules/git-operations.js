@@ -4,7 +4,7 @@
  * Handles all git-related operations
  */
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawnSync } = require("child_process");
 
 /**
  * Creates a git operations manager
@@ -20,10 +20,12 @@ function createGitOperations(outputChannel) {
      */
     function getRepoRoot(workspacePath) {
         try {
-            return execSync('git rev-parse --show-toplevel', {
+            return execSync("git rev-parse --show-toplevel", {
                 cwd: workspacePath,
-                stdio: ['ignore', 'pipe', 'ignore']
-            }).toString().trim();
+                stdio: ["ignore", "pipe", "ignore"],
+            })
+                .toString()
+                .trim();
         } catch (e) {
             return null;
         }
@@ -36,16 +38,21 @@ function createGitOperations(outputChannel) {
      */
     function getCurrentBranch(repoRoot) {
         try {
-            return execSync('git symbolic-ref --short HEAD', {
+            return execSync("git symbolic-ref --short HEAD", {
                 cwd: repoRoot,
-                stdio: ['ignore', 'pipe', 'ignore']
-            }).toString().trim();
+                stdio: ["ignore", "pipe", "ignore"],
+            })
+                .toString()
+                .trim();
         } catch (e) {
-            // Detached HEAD - return short hash
-            return execSync('git rev-parse --short HEAD', {
+            // Detached HEAD or other error - return short hash if possible
+            out.appendLine(`git-autopush: getCurrentBranch note: ${e.message}`);
+            return execSync("git rev-parse --short HEAD", {
                 cwd: repoRoot,
-                stdio: ['ignore', 'pipe', 'ignore']
-            }).toString().trim();
+                stdio: ["ignore", "pipe", "ignore"],
+            })
+                .toString()
+                .trim();
         }
     }
 
@@ -57,7 +64,9 @@ function createGitOperations(outputChannel) {
      */
     function isFileIgnored(filePath, repoRoot) {
         try {
-            const result = spawnSync('git', ['check-ignore', filePath], { cwd: repoRoot });
+            const result = spawnSync("git", ["check-ignore", filePath], {
+                cwd: repoRoot,
+            });
             return result.status === 0;
         } catch (e) {
             return false;
@@ -71,10 +80,12 @@ function createGitOperations(outputChannel) {
      */
     function getHeadCommit(repoRoot) {
         try {
-            return execSync('git rev-parse HEAD', {
+            return execSync("git rev-parse HEAD", {
                 cwd: repoRoot,
-                stdio: ['ignore', 'pipe', 'ignore']
-            }).toString().trim();
+                stdio: ["ignore", "pipe", "ignore"],
+            })
+                .toString()
+                .trim();
         } catch (e) {
             return null;
         }
@@ -89,24 +100,24 @@ function createGitOperations(outputChannel) {
     function getStagedDiff(repoRoot, maxLength = 8000) {
         try {
             // Stage all changes first
-            execSync('git add -A', {
+            execSync("git add -A", {
                 cwd: repoRoot,
-                stdio: ['ignore', 'pipe', 'ignore']
+                stdio: ["ignore", "pipe", "ignore"],
             });
 
-            let diff = execSync('git diff --cached --no-color --unified=3', {
+            let diff = execSync("git diff --cached --no-color --unified=3", {
                 cwd: repoRoot,
-                stdio: ['ignore', 'pipe', 'ignore']
+                stdio: ["ignore", "pipe", "ignore"],
             }).toString();
 
             if (diff.length > maxLength) {
-                diff = diff.slice(0, maxLength) + '\n...(truncated)';
+                diff = diff.slice(0, maxLength) + "\n...(truncated)";
             }
 
             return diff;
         } catch (e) {
             out.appendLine(`git-autopush: getStagedDiff error: ${e.message}`);
-            return '';
+            return "";
         }
     }
 
@@ -120,10 +131,10 @@ function createGitOperations(outputChannel) {
         try {
             return execSync(`git diff --no-color -- "${relativePath}"`, {
                 cwd: repoRoot,
-                stdio: ['ignore', 'pipe', 'ignore']
+                stdio: ["ignore", "pipe", "ignore"],
             }).toString();
         } catch (e) {
-            return '';
+            return "";
         }
     }
 
@@ -140,22 +151,22 @@ function createGitOperations(outputChannel) {
         // Escape message for shell
         const escapedMessage = message
             .replace(/"/g, '\\"')
-            .replace(/\$/g, '\\$');
+            .replace(/\$/g, "\\$");
 
         const commands = [
-            'git add -A',
-            `git commit -m "${escapedMessage}" || echo "nothing to commit"`
+            "git add -A",
+            `git commit -m "${escapedMessage}" || echo "nothing to commit"`,
         ];
 
         if (push) {
             commands.push(`git push origin ${branch}`);
         }
 
-        const cwdPrefix = workspaceFolder 
+        const cwdPrefix = workspaceFolder
             ? `cd "${workspaceFolder.replace(/"/g, '\\"')}" && `
-            : '';
+            : "";
 
-        return cwdPrefix + commands.join(' && ');
+        return cwdPrefix + commands.join(" && ");
     }
 
     /**
@@ -165,7 +176,7 @@ function createGitOperations(outputChannel) {
      * @returns {string} Reset command
      */
     function buildResetCommand(workspaceFolder, resetType) {
-        const flag = resetType === 'hard' ? '--hard' : '--soft';
+        const flag = resetType === "hard" ? "--hard" : "--soft";
         return `cd "${workspaceFolder}" && git reset ${flag} HEAD~1`;
     }
 
@@ -177,7 +188,7 @@ function createGitOperations(outputChannel) {
         getStagedDiff,
         getFileDiff,
         buildCommitCommand,
-        buildResetCommand
+        buildResetCommand,
     };
 }
 
