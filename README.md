@@ -126,6 +126,15 @@ Generate AI-powered Pull Request descriptions from your commit history:
 
 ---
 
+## Troubleshooting
+
+- **AI not generating messages?** Ensure your OpenRouter API key is set correctly via `Ctrl+Shift+P` → `Git AutoPush: Set API Key`.
+- **Not committing on save?** Check if `Git Autopush: Auto Commit` is enabled in settings or the status bar.
+- **Repository not detected?** The extension only works within a valid Git repository. Run `git init` if needed.
+- **Sensitive files being committed?** Check the `gitAutopush.sensitiveFileGlobs` setting to add more ignore patterns.
+
+---
+
 ## Credits
 
 - Built by Prabesh Pandey and contributors
