@@ -121,7 +121,7 @@ Generate AI-powered Pull Request descriptions from your commit history:
 ## Requirements
 
 - **Git** must be installed and available in your PATH.
-- **VS Code** 1.70+
+- **VS Code** 1.60+
 - **OpenRouter API Key** (for AI commit messages)
 
 ---
