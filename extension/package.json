@@ -5,7 +5,7 @@
   "publisher": "local",
   "repository": {
     "type": "git",
-    "url": "https://github.com/local/git-autopush-on-save.git"
+    "url": "https://github.com/Prabesh-Pandey/git-commit-buddy.git"
   },
   "version": "1.0.1",
   "engines": {
