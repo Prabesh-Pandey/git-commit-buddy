@@ -12,3 +12,17 @@ node_modules/
 # Build artifacts
 *.vsix
 temp_vsix/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.swp
+*~
+
