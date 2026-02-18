@@ -5,3 +5,10 @@ git-autopush.md
 
 # Ignore local VS Code workspace settings (keep them local)
 .vscode/settings.json
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.vsix
+temp_vsix/
