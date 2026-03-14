@@ -47,8 +47,8 @@ function createStatsManager(context) {
      * Save stats to global state
      * @param {object} stats - Stats object to save
      */
-    function saveStats(stats) {
-        context.globalState.update(STORAGE_KEY, stats);
+    async function saveStats(stats) {
+        await context.globalState.update(STORAGE_KEY, stats);
     }
 
     /**
@@ -67,9 +67,9 @@ function createStatsManager(context) {
     /**
      * Update stats after a commit
      * @param {string} commitMessage - The commit message
-     * @returns {object} Updated stats
+     * @returns {Promise<object>} Updated stats
      */
-    function updateStats(commitMessage) {
+    async function updateStats(commitMessage) {
         const stats = getStats();
         const today = new Date().toDateString();
         const lastDate = stats.lastCommitDate 
@@ -79,14 +79,18 @@ function createStatsManager(context) {
         stats.totalCommits++;
 
         if (lastDate === today) {
+            // Same day — just bump today counter
             stats.todayCommits++;
         } else {
+            // New day (or first-ever commit when lastDate is null)
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
             
             if (lastDate === yesterday.toDateString()) {
+                // Consecutive day — extend streak
                 stats.streak++;
-            } else if (lastDate !== today) {
+            } else {
+                // Gap of 2+ days or first-ever commit — start fresh streak
                 stats.streak = 1;
             }
             stats.todayCommits = 1;
@@ -108,7 +112,7 @@ function createStatsManager(context) {
         }
 
         checkAchievements(stats);
-        saveStats(stats);
+        await saveStats(stats);
         return stats;
     }
 
