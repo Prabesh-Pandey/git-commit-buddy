@@ -349,7 +349,8 @@ CRITICAL RULES:
     return {
         generateCommitMessage,
         validateApiKey,
-        testConnection
+        testConnection,
+        makeAPIRequest
     };
 }
 

@@ -383,9 +383,7 @@ function createPRGenerator(outputChannel) {
         const systemPrompt = buildPRSystemPrompt(useEmoji);
         const userPrompt = `Generate a Pull Request description for the following changes:\n\n${context}\n\nDIFF PREVIEW:\n${diff.slice(0, 3000)}`;
 
-        // Call AI (reusing existing infrastructure)
-        const https = require('https');
-        
+        // Call AI via shared ai-service HTTP client
         const payload = JSON.stringify({
             model,
             messages: [
@@ -397,7 +395,7 @@ function createPRGenerator(outputChannel) {
         });
 
         try {
-            const response = await makeAIRequest(apiKey, payload);
+            const response = await aiService.makeAPIRequest(apiKey, payload);
             const parsed = parsePRResponse(response);
             return parsed;
         } catch (e) {
@@ -454,45 +452,6 @@ CRITICAL RULES:
 - Start your response with "TITLE: " followed by the title`;
     }
 
-    /**
-     * Make AI API request
-     */
-    function makeAIRequest(apiKey, payload) {
-        return new Promise((resolve, reject) => {
-            const https = require('https');
-            const req = https.request({
-                hostname: 'openrouter.ai',
-                port: 443,
-                path: '/api/v1/chat/completions',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(payload),
-                    'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': 'https://github.com/local/git-autopush-on-save',
-                    'X-Title': 'Git AutoPush Extension'
-                }
-            }, (res) => {
-                let data = '';
-                res.on('data', chunk => data += chunk);
-                res.on('end', () => {
-                    if (res.statusCode < 200 || res.statusCode >= 300) {
-                        reject(new Error(`HTTP ${res.statusCode}`));
-                        return;
-                    }
-                    resolve(data);
-                });
-            });
-
-            req.on('error', reject);
-            req.setTimeout(30000, () => {
-                req.destroy();
-                reject(new Error('Request timeout'));
-            });
-            req.write(payload);
-            req.end();
-        });
-    }
 
     /**
      * Parse AI response into title and description
