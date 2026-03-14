@@ -92,23 +92,29 @@ function createGitOperations(outputChannel) {
     }
 
     /**
-     * Get staged diff
+     * Get staged diff (reads current index without modifying it)
+     * Falls back to unstaged working-tree diff if nothing is staged.
      * @param {string} repoRoot - Repository root
      * @param {number} maxLength - Maximum diff length (default 8000)
      * @returns {string} Diff text
      */
     function getStagedDiff(repoRoot, maxLength = 8000) {
         try {
-            // Stage all changes first
-            execSync("git add -A", {
-                cwd: repoRoot,
-                stdio: ["ignore", "pipe", "ignore"],
-            });
-
+            // Read whatever is currently staged — do NOT stage new files here.
+            // Staging is handled later by buildCommitCommand at commit time.
             let diff = execSync("git diff --cached --no-color --unified=3", {
                 cwd: repoRoot,
                 stdio: ["ignore", "pipe", "ignore"],
             }).toString();
+
+            // If nothing is staged yet, fall back to the unstaged working-tree diff
+            // so the AI can still generate a meaningful commit message.
+            if (!diff.trim()) {
+                diff = execSync("git diff --no-color --unified=3", {
+                    cwd: repoRoot,
+                    stdio: ["ignore", "pipe", "ignore"],
+                }).toString();
+            }
 
             if (diff.length > maxLength) {
                 diff = diff.slice(0, maxLength) + "\n...(truncated)";
