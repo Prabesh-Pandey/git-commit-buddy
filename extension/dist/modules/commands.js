@@ -6,6 +6,7 @@
 
 const vscode = require("vscode");
 const path = require("path");
+const { getSmartMessageWithFile, stripEmoji } = require('./message-picker');
 
 /**
  * Register all extension commands
@@ -280,13 +281,66 @@ function registerCommands(deps) {
         const cfg = vscode.workspace.getConfiguration('gitAutopush');
         const dryRun = cfg.get('dryRun', true);
         const autoPush = cfg.get('autoPush', false);
+        const useEmoji = cfg.get('useEmoji', true);
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
         const rel = workspaceFolder 
             ? path.relative(workspaceFolder, editor.document.uri.fsPath) 
             : editor.document.uri.fsPath;
 
-        const branch = gitOps.getCurrentBranch(workspaceFolder) || 'HEAD';
-        const message = `Manual: ${path.basename(rel)}`;
+        const repoRoot = gitOps.getRepoRoot(workspaceFolder);
+        if (!repoRoot) {
+            vscode.window.showWarningMessage('Git AutoPush: Not a git repository');
+            return;
+        }
+
+        const branch = gitOps.getCurrentBranch(repoRoot) || 'HEAD';
+
+        // Start with smart fallback message
+        let message = getSmartMessageWithFile(editor.document.uri.fsPath, { useEmoji });
+
+        // Try AI generation (mirrors the save handler logic)
+        try {
+            const aiEnabled = cfg.get('ai.enabled', true);
+            const generate = cfg.get('ai.generateCommitMessage', true);
+            const apiKey = cfg.get('ai.apiKey', '') || cfg.get('ai.deepseekApiKey', '') || process.env.DEEPSEEK_API_KEY || '';
+            const model = cfg.get('ai.deepseekModel', 'deepseek/deepseek-chat');
+
+            if (aiEnabled && generate && apiKey) {
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: "Generating commit message...",
+                    cancellable: false
+                }, async () => {
+                    try {
+                        let diffText = gitOps.getStagedDiff(repoRoot);
+                        if (!diffText) {
+                            diffText = gitOps.getFileDiff(repoRoot, rel);
+                        }
+                        if (!diffText) {
+                            diffText = editor.document.getText().slice(0, 2000);
+                        }
+
+                        const commitStyle = cfg.get('ai.commitStyle', 'auto');
+                        const conventionalCommits = cfg.get('ai.conventionalCommits', true);
+                        const includeScope = cfg.get('ai.includeScope', true);
+
+                        let generated = await aiService.generateCommitMessage({
+                            apiKey, model, diffText, fileName: rel,
+                            useEmoji, commitStyle, conventionalCommits, includeScope
+                        });
+
+                        if (generated && !useEmoji) {
+                            generated = stripEmoji(generated);
+                        }
+                        message = generated || message;
+                    } catch (err) {
+                        out.appendLine(`git-autopush: AI failed for runOnce: ${err?.message || err}`);
+                    }
+                });
+            }
+        } catch (e) {
+            out.appendLine(`git-autopush: runOnce AI error: ${e?.message || e}`);
+        }
 
         const cmd = gitOps.buildCommitCommand({
             workspaceFolder,
@@ -299,7 +353,7 @@ function registerCommands(deps) {
         if (!dryRun) {
             terminal.sendText(cmd, true);
             statsManager.updateStats(message);
-            vscode.window.showInformationMessage('Manual commit done');
+            vscode.window.showInformationMessage(`Committed: ${message.split('\n')[0].slice(0, 50)}`);
         } else {
             out.appendLine('Dry run: ' + cmd);
             out.show();
