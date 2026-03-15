@@ -76,6 +76,30 @@ function activate(context) {
     context.subscriptions.push(uiManager.getStatusBarItem());
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // 🔄 DEPRECATED KEY MIGRATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    const migrationConfig = vscode.workspace.getConfiguration('gitAutopush');
+    const oldKey = migrationConfig.get('ai.deepseekApiKey', '');
+    const newKey = migrationConfig.get('ai.apiKey', '');
+
+    if (oldKey && !newKey) {
+        // Auto-migrate: copy old key to new setting and clear the old one
+        migrationConfig.update('ai.apiKey', oldKey, vscode.ConfigurationTarget.Global).then(() => {
+            migrationConfig.update('ai.deepseekApiKey', '', vscode.ConfigurationTarget.Global);
+            outputChannel.appendLine('git-autopush: Migrated deprecated ai.deepseekApiKey → ai.apiKey');
+            vscode.window.showInformationMessage(
+                'Git AutoPush: Your API key has been migrated from the deprecated "deepseekApiKey" to "apiKey". No action needed.'
+            );
+        });
+    } else if (oldKey && newKey) {
+        // Both set — warn the user and log which one is being used
+        outputChannel.appendLine(
+            'git-autopush: WARNING — both ai.apiKey and deprecated ai.deepseekApiKey are set. Using ai.apiKey.'
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // 💾 MAIN SAVE HANDLER
     // ═══════════════════════════════════════════════════════════════════════════
 
