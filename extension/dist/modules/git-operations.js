@@ -145,6 +145,25 @@ function createGitOperations(outputChannel) {
     }
 
     /**
+     * Escape a string for safe use inside single-quoted shell arguments.
+     * Wraps the value in single quotes with proper escaping of embedded
+     * single quotes: ' → '\'' (end quote, escaped quote, re-open quote).
+     * This is the safest general-purpose shell quoting strategy because
+     * single-quoted strings treat ALL characters as literal except '.
+     * @param {string} str - Raw string to escape
+     * @returns {string} Shell-safe single-quoted string
+     */
+    function shellEscape(str) {
+        if (typeof str !== 'string') {
+            str = String(str);
+        }
+        // Replace newlines with spaces (commit messages should be single-line
+        // when passed via -m; multi-line bodies need a separate mechanism)
+        str = str.replace(/[\r\n]+/g, ' ').trim();
+        return "'" + str.replace(/'/g, "'\\''") + "'";
+    }
+
+    /**
      * Build git command string for commit and optional push
      * @param {object} options - Command options
      * @param {string} options.workspaceFolder - Workspace folder path
@@ -154,22 +173,20 @@ function createGitOperations(outputChannel) {
      * @returns {string} Full command string
      */
     function buildCommitCommand({ workspaceFolder, message, branch, push }) {
-        // Escape message for shell
-        const escapedMessage = message
-            .replace(/"/g, '\\"')
-            .replace(/\$/g, "\\$");
+        const safeMessage = shellEscape(message);
+        const safeBranch = shellEscape(branch);
 
         const commands = [
             "git add -A",
-            `git commit -m "${escapedMessage}" || echo "nothing to commit"`,
+            `git commit -m ${safeMessage} || echo 'nothing to commit'`,
         ];
 
         if (push) {
-            commands.push(`git push origin ${branch}`);
+            commands.push(`git push origin ${safeBranch}`);
         }
 
         const cwdPrefix = workspaceFolder
-            ? `cd "${workspaceFolder.replace(/"/g, '\\"')}" && `
+            ? `cd ${shellEscape(workspaceFolder)} && `
             : "";
 
         return cwdPrefix + commands.join(" && ");
@@ -183,7 +200,7 @@ function createGitOperations(outputChannel) {
      */
     function buildResetCommand(workspaceFolder, resetType) {
         const flag = resetType === "hard" ? "--hard" : "--soft";
-        return `cd "${workspaceFolder}" && git reset ${flag} HEAD~1`;
+        return `cd ${shellEscape(workspaceFolder)} && git reset ${flag} HEAD~1`;
     }
 
     return {
