@@ -38,19 +38,19 @@ function activate(context) {
     // ═══════════════════════════════════════════════════════════════════════════
     // 🔧 INITIALIZE CORE COMPONENTS
     // ═══════════════════════════════════════════════════════════════════════════
-    
+
     const terminal = vscode.window.createTerminal('git-autopush');
     const outputChannel = vscode.window.createOutputChannel('git-autopush-debug');
-    
+
     outputChannel.appendLine('git-autopush: Initializing modules...');
 
     // Initialize modules
     const statsManager = createStatsManager(context);
     const aiService = createAIService(outputChannel);
     const gitOps = createGitOperations(outputChannel);
-    const uiManager = createUIManager({ 
-        getStats: statsManager.getStats, 
-        outputChannel 
+    const uiManager = createUIManager({
+        getStats: statsManager.getStats,
+        outputChannel
     });
 
     // Shared state (mutable, passed by reference)
@@ -137,17 +137,17 @@ function activate(context) {
  * @param {object} deps - Dependencies
  */
 async function handleSave(doc, deps) {
-    const { 
-        context, 
-        statsManager, 
-        aiService, 
-        gitOps, 
-        uiManager, 
-        terminal, 
+    const {
+        context,
+        statsManager,
+        aiService,
+        gitOps,
+        uiManager,
+        terminal,
         outputChannel,
-        state 
+        state
     } = deps;
-    
+
     const out = outputChannel;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -181,7 +181,7 @@ async function handleSave(doc, deps) {
     }
 
     out.appendLine(`git-autopush: valid token for ${doc.uri.fsPath}`);
-    
+
     // Clear token
     context.workspaceState.update('gitAutopush.triggeredBySaveKeyFor', null);
     state.triggerNonces.delete(doc.uri.fsPath);
@@ -200,8 +200,8 @@ async function handleSave(doc, deps) {
     const useEmoji = config.get('useEmoji', true);
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-    const rel = workspaceFolder 
-        ? path.relative(workspaceFolder, doc.uri.fsPath) 
+    const rel = workspaceFolder
+        ? path.relative(workspaceFolder, doc.uri.fsPath)
         : doc.uri.fsPath;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -252,6 +252,14 @@ async function handleSave(doc, deps) {
     let canPush = autoPush;
     if (autoPush && protectedBranches.includes(branch)) {
         out.appendLine(`git-autopush: protected branch '${branch}' — no push`);
+        vscode.window.showWarningMessage(
+            `Git AutoPush: Push skipped — '${branch}' is a protected branch. Remove it from gitAutopush.protectedBranches to enable push.`,
+            'Open Settings'
+        ).then(sel => {
+            if (sel === 'Open Settings') {
+                vscode.commands.executeCommand('workbench.action.openSettings', 'gitAutopush.protectedBranches');
+            }
+        });
         canPush = false;
     }
 
@@ -358,7 +366,7 @@ async function handleSave(doc, deps) {
 
     if (!dryRun) {
         terminal.sendText(fullCmd, true);
-        
+
         // Update stats and store commit info for undo
         const stats = statsManager.updateStats(message);
         state.lastCommitInfo = {

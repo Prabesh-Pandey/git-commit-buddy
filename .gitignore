@@ -26,3 +26,5 @@ Thumbs.db
 *.swp
 *~
 
+# Graphify
+graphify-out/
