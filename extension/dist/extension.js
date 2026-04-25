@@ -1,7 +1,7 @@
 "use strict";
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * 🚀 GIT AUTOPUSH ON SAVE - MODULAR EDITION
+ *  GIT AUTOPUSH ON SAVE - MODULAR EDITION
  * ═══════════════════════════════════════════════════════════════════════════════
  * 
  * Main extension entry point. This file orchestrates all modules:
@@ -36,7 +36,7 @@ const { getSmartMessageWithFile, stripEmoji } = require("./modules/message-picke
  */
 function activate(context) {
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🔧 INITIALIZE CORE COMPONENTS
+    //  INITIALIZE CORE COMPONENTS
     // ═══════════════════════════════════════════════════════════════════════════
 
     const terminal = vscode.window.createTerminal('git-autopush');
@@ -76,7 +76,7 @@ function activate(context) {
     context.subscriptions.push(uiManager.getStatusBarItem());
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🔄 DEPRECATED KEY MIGRATION
+    //  DEPRECATED KEY MIGRATION
     // ═══════════════════════════════════════════════════════════════════════════
 
     const migrationConfig = vscode.workspace.getConfiguration('gitAutopush');
@@ -100,7 +100,7 @@ function activate(context) {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 💾 MAIN SAVE HANDLER
+    //  MAIN SAVE HANDLER
     // ═══════════════════════════════════════════════════════════════════════════
 
     const onSave = vscode.workspace.onDidSaveTextDocument(async (doc) => {
@@ -118,7 +118,7 @@ function activate(context) {
     context.subscriptions.push(onSave);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🎉 STARTUP MESSAGE
+    //  STARTUP MESSAGE
     // ═══════════════════════════════════════════════════════════════════════════
 
     const stats = statsManager.getStats();
@@ -151,7 +151,7 @@ async function handleSave(doc, deps) {
     const out = outputChannel;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🔐 VALIDATE TRIGGER TOKEN
+    //  VALIDATE TRIGGER TOKEN
     // ═══════════════════════════════════════════════════════════════════════════
 
     const token = context.workspaceState.get('gitAutopush.triggeredBySaveKeyFor', null);
@@ -187,7 +187,7 @@ async function handleSave(doc, deps) {
     state.triggerNonces.delete(doc.uri.fsPath);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 📝 LOAD CONFIGURATION
+    //  LOAD CONFIGURATION
     // ═══════════════════════════════════════════════════════════════════════════
 
     const config = vscode.workspace.getConfiguration('gitAutopush');
@@ -205,7 +205,7 @@ async function handleSave(doc, deps) {
         : doc.uri.fsPath;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // ✅ VALIDATION CHECKS
+    //  VALIDATION CHECKS
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Check glob match
@@ -264,7 +264,7 @@ async function handleSave(doc, deps) {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🤖 GENERATE COMMIT MESSAGE (AI or Smart Default)
+    //  GENERATE COMMIT MESSAGE (AI or Smart Default)
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Start with smart contextual message as fallback
@@ -351,7 +351,7 @@ async function handleSave(doc, deps) {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 🚀 EXECUTE GIT COMMANDS
+    //  EXECUTE GIT COMMANDS
     // ═══════════════════════════════════════════════════════════════════════════
 
     const fullCmd = gitOps.buildCommitCommand({
